@@ -6211,6 +6211,13 @@ a:hover {
   align-items: center;
   flex-wrap: wrap;
 }
+.opening-settings { margin: 16px 0; padding: 12px; border: 1px solid #dbe3ec; border-radius: 8px; }
+.opening-settings summary { cursor: pointer; font-weight: 700; }
+.opening-table-scroll { overflow-x: auto; }
+.opening-table { width: 100%; min-width: 720px; border-collapse: collapse; }
+.opening-table th, .opening-table td { padding: 8px; border-bottom: 1px solid #dbe3ec; text-align: left; }
+.opening-table input { width: 140px; }
+.opening-settings button { margin-top: 12px; }
 .workspace {
   padding: 28px 32px;
   max-width: 1700px;

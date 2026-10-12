@@ -23929,7 +23929,7 @@ function taxReport(s, start, end) {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(start) || !/^\d{4}-\d{2}-\d{2}$/.test(end) || start > end) throw new Error("\u671F\u9593\u3092\u6307\u5B9A\u3057\u3066\u304F\u3060\u3055\u3044");
   const headers = new Map(s.journals.filter((j) => j.status === "ACTIVE" && j.transaction_date <= end).map((j) => [j.id, j]));
   const all = s.lines.filter((l) => headers.get(l.journal_id)?.revision === l.revision).map((l) => ({ ...l, date: headers.get(l.journal_id).transaction_date }));
-  const period = all.filter((l) => l.date >= start);
+  const period = all.filter((l) => l.date >= start && headers.get(l.journal_id)?.journal_kind !== "OPENING");
   const groups = /* @__PURE__ */ new Map();
   let unknown = 0;
   const snapshot = { input: 0n, output: 0n };
@@ -23955,7 +23955,8 @@ function taxReport(s, start, end) {
   for (const key of ["input", "output", "payable"]) {
     const aid = s.company.tax_accounts?.[key], normal = key === "input" ? 1n : -1n;
     const lines = all.filter((l) => l.account_id === aid), flow = (xs) => xs.reduce((n, l) => n + (BigInt(l.debit_amount) - BigInt(l.credit_amount)) * normal, 0n);
-    const inPeriod = lines.filter((l) => l.date >= start), opening = flow(lines.filter((l) => l.date < start)), movement = flow(inPeriod), manual = flow(inPeriod.filter((l) => !l.is_tax_line)), expected = key === "payable" ? 0n : snapshot[key];
+    const isOpening = (l) => headers.get(l.journal_id)?.journal_kind === "OPENING";
+    const inPeriod = lines.filter((l) => l.date >= start && !isOpening(l)), opening = flow(lines.filter((l) => l.date < start || isOpening(l) && l.date === start)), movement = flow(inPeriod), manual = flow(inPeriod.filter((l) => !l.is_tax_line)), expected = key === "payable" ? 0n : snapshot[key];
     balances[key] = { opening: String(opening), movement: String(movement), closing: String(opening + movement), snapshot: String(expected), manual: String(manual), difference: String(movement - expected), unexplained: String(movement - expected - manual) };
   }
   return { rows: [...groups.values()].map((g) => ({ ...g, taxable_amount: String(g.taxable_amount), tax_amount: String(g.tax_amount), gross_amount: String(g.gross_amount), journal_count: g.journals.size, journals: void 0 })), unknown, balances, net_balance: String(BigInt(balances.output.closing) - BigInt(balances.input.closing)) };
@@ -23984,6 +23985,7 @@ function open(s, d) {
   return y;
 }
 function canEdit(s, j) {
+  if (j.journal_kind === "OPENING") return false;
   try {
     open(s, j.transaction_date);
     return j.status === "ACTIVE";
@@ -23992,7 +23994,44 @@ function canEdit(s, j) {
   }
 }
 function postingLines(s, end = "9999-12-31") {
-  return s.journals.filter((j) => j.status === "ACTIVE" && j.transaction_date <= end).flatMap((j) => currentLines(s, j).map((l) => ({ ...l, date: j.transaction_date, journal_number: j.journal_number, description: j.description })));
+  return s.journals.filter((j) => j.status === "ACTIVE" && j.transaction_date <= end).flatMap((j) => currentLines(s, j).map((l) => ({ ...l, date: j.transaction_date, journal_number: j.journal_number, description: j.description, journal_kind: j.journal_kind, year_id: j.year_id })));
+}
+function amount(v) {
+  assert(typeof v === "number" && Number.isSafeInteger(v) || typeof v === "string" && /^\d+$/.test(v), "金額は0以上の整数円で入力してください");
+  const n = BigInt(v);
+  assert(n >= 0n && n <= 999999999999n, "1明細の金額上限は999,999,999,999円です");
+  return Number(n);
+}
+function openingPlan(s, yearId, balances) {
+  const y = s.years.find((year) => year.id === yearId);
+  assert(y, "会計年度が見つかりません");
+  const existing = s.journals.filter((j) => j.status === "ACTIVE" && j.year_id === y.id && j.journal_kind === "OPENING");
+  assert(existing.length <= 1, "期首残高仕訳が重複しています");
+  const old = existing[0];
+  const baseline = reports({ ...s, journals: s.journals.filter((j) => j.id !== old?.id) }, y.start, y.start).rows;
+  const accounts = baseline.filter((a) => a.statement_type === "BS");
+  const rows = accounts.map((a) => {
+    const adjustment = old ? currentLines(s, old).filter((l) => l.account_id === a.id).reduce((n, l) => n + BigInt(l.debit_amount) - BigInt(l.credit_amount), 0n) : 0n;
+    return { ...a, baseline: a.opening, target: String(BigInt(a.opening) + adjustment) };
+  });
+  if (!balances) return { year: y, old, rows };
+  assert(Array.isArray(balances) && balances.length === accounts.length, "全BS科目の期首残高を指定してください");
+  assert(new Set(balances.map((b) => b.account_id)).size === accounts.length, "勘定科目が重複しています");
+  let targetTotal = 0n;
+  const targets = balances.map((b) => {
+    const a = rows.find((a) => a.id === b.account_id);
+    assert(a, "BS科目だけを指定してください");
+    const debit = amount(b.debit_amount || 0), credit = amount(b.credit_amount || 0);
+    assert(!debit || !credit, "同じ科目の借方・貸方を同時に入力できません");
+    const target = BigInt(debit) - BigInt(credit), delta = target - BigInt(a.baseline);
+    assert(a.active || target === BigInt(a.target), "無効科目の期首残高は変更できません");
+    targetTotal += target;
+    return { ...a, target: String(target), delta: String(delta) };
+  });
+  assert(targetTotal === 0n, "期首残高の貸借が一致していません");
+  const lines = targets.filter((a) => BigInt(a.delta) !== 0n).map((a) => ({ account_id: a.id, debit_amount: amount(BigInt(a.delta) > 0n ? a.delta : "0"), credit_amount: amount(BigInt(a.delta) < 0n ? String(-BigInt(a.delta)) : "0"), tax_code: "UNSPECIFIED", line_description: "期首残高の差額調整" }));
+  assert(lines.reduce((n, l) => n + BigInt(l.debit_amount) - BigInt(l.credit_amount), 0n) === 0n, "繰越残高の貸借が一致していません。元データを確認してください");
+  return { year: y, old, rows: targets, lines, changed: targets.some((a) => a.target !== rows.find((r) => r.id === a.id).target) };
 }
 function reports(s, start, end) {
   date(start);
@@ -24003,11 +24042,11 @@ function reports(s, start, end) {
   const ls = postingLines(s, end);
   const rows = s.accounts.map((a) => {
     const mine = ls.filter((l) => l.account_id === a.id);
-    let opening = mine.filter((l) => l.date < start && (a.statement_type === "BS" || l.date >= y.start)).reduce((n, l) => n + BigInt(l.debit_amount) - BigInt(l.credit_amount), 0n);
+    let opening = mine.filter((l) => (l.date < start || l.journal_kind === "OPENING" && l.year_id === y.id) && (a.statement_type === "BS" || l.date >= y.start)).reduce((n, l) => n + BigInt(l.debit_amount) - BigInt(l.credit_amount), 0n);
     if (a.tag === "RETAINED") {
       opening += ls.filter((l) => l.date < y.start && s.accounts.find((a2) => a2.id === l.account_id)?.statement_type === "PL").reduce((n, l) => n + BigInt(l.credit_amount) - BigInt(l.debit_amount), 0n) * -1n;
     }
-    const period = mine.filter((l) => l.date >= start), debit = sum(period, "debit_amount"), credit = sum(period, "credit_amount");
+    const period = mine.filter((l) => l.date >= start && !(l.journal_kind === "OPENING" && l.year_id === y.id)), debit = sum(period, "debit_amount"), credit = sum(period, "credit_amount");
     return { ...a, opening: opening.toString(), debit: debit.toString(), credit: credit.toString(), closing: (opening + debit - credit).toString() };
   });
   const groups = {};
@@ -24024,10 +24063,10 @@ function reports(s, start, end) {
   return { rows, groups: Object.fromEntries(Object.entries(groups).map(([k, v]) => [k, v.toString()])), pl: { gross: String(gross), operating: String(op), ordinary: String(ordinary), pretax: String(pretax), net: String(net) }, bs: { assets: String(assets), liabilities: String(liabilities), equity: String(equity), ytd_profit: String(ytd), difference: String(assets - liabilities - equity) }, trial: { opening_difference: String(openingDiff), movement_difference: String(movementDiff), closing_difference: String(closingDiff) }, dashboard: { sales: String(g("SALES")), expenses: String(g("COGS") + g("SGA") + g("OTHER_EXPENSE") + g("EXTRA_EXPENSE") + g("TAX")), profit: String(net), ytd_profit: String(ytd), ytd_sales: String(ls.filter((l) => l.date >= y.start && s.accounts.find((a) => a.id === l.account_id)?.section === "SALES").reduce((n, l) => n + BigInt(l.credit_amount) - BigInt(l.debit_amount), 0n)), cash: String(tag("CASH")), ar: String(tag("AR")), ap: String(tag("AP")) } };
 }
 function ledger(s, accountId, start, end) {
-  const r2 = reports(s, start, end), a = r2.rows.find((a2) => a2.id === accountId);
+  const r = reports(s, start, end), a = r.rows.find((a2) => a2.id === accountId);
   assert(a, "\u79D1\u76EE\u3092\u9078\u629E\u3057\u3066\u304F\u3060\u3055\u3044");
   let balance = BigInt(a.opening);
-  const rows = postingLines(s, end).filter((l) => l.account_id === accountId && l.date >= start).sort((a2, b) => a2.date.localeCompare(b.date) || a2.journal_number.localeCompare(b.journal_number) || a2.id.localeCompare(b.id)).map((l) => {
+  const rows = postingLines(s, end).filter((l) => l.account_id === accountId && l.date >= start && l.journal_kind !== "OPENING").sort((a2, b) => a2.date.localeCompare(b.date) || a2.journal_number.localeCompare(b.journal_number) || a2.id.localeCompare(b.id)).map((l) => {
     balance += BigInt(l.debit_amount) - BigInt(l.credit_amount);
     const j = s.journals.find((j2) => j2.id === l.journal_id);
     const opposite = currentLines(s, j).filter((x) => l.debit_amount > 0 ? x.credit_amount > 0 : x.debit_amount > 0).map((x) => s.accounts.find((a2) => a2.id === x.account_id)?.account_name).filter((x, i, arr) => arr.indexOf(x) === i);
@@ -25699,6 +25738,41 @@ function download(text, name, type = "text/csv;charset=utf-8") {
   a.click();
   setTimeout(() => URL.revokeObjectURL(url), 1e3);
 }
+
+function OpeningBalances({ s, year, act, busy }) {
+  const plan = openingPlan(s, year.id);
+  const [balances, setBalances] = (0, import_react8.useState)(() => plan.rows.map((a) => ({ account_id: a.id, debit_amount: BigInt(a.target) > 0n ? a.target : "0", credit_amount: BigInt(a.target) < 0n ? String(-BigInt(a.target)) : "0" })));
+  const [reason, setReason] = (0, import_react8.useState)("");
+  const [confirmed, setConfirmed] = (0, import_react8.useState)(false);
+  const startJournals = s.journals.filter((j) => j.status === "ACTIVE" && j.transaction_date === year.start && j.journal_kind !== "OPENING").length;
+  const debit = balances.reduce((n, b) => n + BigInt(b.debit_amount || "0"), 0n);
+  const credit = balances.reduce((n, b) => n + BigInt(b.credit_amount || "0"), 0n);
+  const editable = year.status === "OPEN" && s.periods.find((p) => p.year_id === year.id && p.start === year.start)?.status === "OPEN" && s.years.filter((y) => y.end < year.start).every((y) => y.status === "LOCKED");
+  const changed = balances.some((b, i) => String(BigInt(b.debit_amount || "0") - BigInt(b.credit_amount || "0")) !== plan.rows[i].target);
+  const update = (index, key, value) => setBalances(balances.map((b, i) => i === index ? { ...b, [key]: value.replace(/\D/g, "").slice(0, 12) } : b));
+  return (0, import_jsx_runtime31.jsxs)("details", { className: "opening-settings", children: [
+    (0, import_jsx_runtime31.jsx)("summary", { children: "期首残高を設定（差額仕訳）" }),
+    (0, import_jsx_runtime31.jsx)("p", { children: "設定したい期首残高を借方・貸方で入力してください。繰越残高との差額だけを保存し、当期発生額には含めません。再保存は同じ仕訳を改訂します。" }),
+    !editable && (0, import_jsx_runtime31.jsx)("p", { className: "muted", children: "対象年度と期首月をOPENにし、前年度までをLOCKすると設定できます。" }),
+    (0, import_jsx_runtime31.jsx)("form", { onSubmit: (e) => { e.preventDefault(); act({ type: "opening", year_id: year.id, balances, reason, confirm_start_journals: confirmed }); }, children: (0, import_jsx_runtime31.jsxs)("fieldset", { disabled: busy || !editable, children: [
+      (0, import_jsx_runtime31.jsx)("div", { className: "opening-table-scroll", children: (0, import_jsx_runtime31.jsxs)("table", { className: "opening-table", children: [
+        (0, import_jsx_runtime31.jsx)("thead", { children: (0, import_jsx_runtime31.jsx)("tr", { children: ["勘定科目", "繰越残高（借＋／貸−）", "設定残高・借方", "設定残高・貸方", "保存する差額（借＋／貸−）"].map((label) => (0, import_jsx_runtime31.jsx)("th", { children: label }, label)) }) }),
+        (0, import_jsx_runtime31.jsx)("tbody", { children: plan.rows.map((a, i) => (0, import_jsx_runtime31.jsx)("tr", { children: [
+          (0, import_jsx_runtime31.jsx)("td", { children: `${a.account_code} ${a.account_name}` }),
+          (0, import_jsx_runtime31.jsx)("td", { children: a.baseline }),
+          (0, import_jsx_runtime31.jsx)("td", { children: (0, import_jsx_runtime31.jsx)(Input, { "aria-label": `${a.account_name} 期首借方`, inputMode: "numeric", value: balances[i].debit_amount, disabled: !a.active, onChange: (e) => update(i, "debit_amount", e.target.value) }) }),
+          (0, import_jsx_runtime31.jsx)("td", { children: (0, import_jsx_runtime31.jsx)(Input, { "aria-label": `${a.account_name} 期首貸方`, inputMode: "numeric", value: balances[i].credit_amount, disabled: !a.active, onChange: (e) => update(i, "credit_amount", e.target.value) }) }),
+          (0, import_jsx_runtime31.jsx)("td", { children: String(BigInt(balances[i].debit_amount || "0") - BigInt(balances[i].credit_amount || "0") - BigInt(a.baseline)) })
+        ] }, a.id)) })
+      ] }) }),
+      (0, import_jsx_runtime31.jsx)("p", { role: "status", children: `借方合計 ${debit}円 ／ 貸方合計 ${credit}円 ／ 差額 ${debit - credit}円` }),
+      startJournals > 0 && (0, import_jsx_runtime31.jsxs)("label", { className: "row", children: [(0, import_jsx_runtime31.jsx)("input", { type: "checkbox", required: true, checked: confirmed, onChange: (e) => setConfirmed(e.target.checked) }), `期首日に通常仕訳が${startJournals}件あります。開始残高の重複がないことを確認しました。既存の開始残高仕訳は自動変換されません。`] }),
+      (0, import_jsx_runtime31.jsxs)("label", { children: ["設定理由（必須）", (0, import_jsx_runtime31.jsx)(Input, { required: true, maxLength: 300, value: reason, onChange: (e) => setReason(e.target.value) })] }),
+      (0, import_jsx_runtime31.jsx)(Button, { type: "submit", disabled: !changed || debit !== credit || !reason.trim(), children: "差額を期首残高仕訳として保存" })
+    ] }) })
+  ] });
+}
+
 function AccountingApp() {
   const [companies, setCompanies] = (0, import_react8.useState)([]), [s, setS] = (0, import_react8.useState)(null), [page, setPage] = (0, import_react8.useState)("\u30C0\u30C3\u30B7\u30E5\u30DC\u30FC\u30C9"), [busy, setBusy] = (0, import_react8.useState)(false), [error, setError] = (0, import_react8.useState)(""), [notice, setNotice] = (0, import_react8.useState)(""), [start, setStart] = (0, import_react8.useState)(""), [end, setEnd] = (0, import_react8.useState)(""), [yearId, setYearId] = (0, import_react8.useState)(""), [editor, setEditor] = (0, import_react8.useState)(null), [modal, setModal] = (0, import_react8.useState)(null), [confirm, setConfirm] = (0, import_react8.useState)(null), [reason, setReason] = (0, import_react8.useState)(""), [detail, setDetail] = (0, import_react8.useState)(null), [user, setUser] = (0, import_react8.useState)("");
   const [filters, setFilters] = (0, import_react8.useState)({ number: "", account: "", sub: "", description: "", counterparty: "", min: "", max: "", deleted: false }), [ledgerId, setLedgerId] = (0, import_react8.useState)("");
@@ -26057,6 +26131,7 @@ function AccountingApp() {
             ] }),
             /* @__PURE__ */ (0, import_jsx_runtime31.jsx)("p", { className: "muted", children: "CLOSED\u306F\u7406\u7531\u3092\u8A18\u9332\u3057\u3066\u518DOPEN\u3067\u304D\u307E\u3059\u3002LOCKED\u306F\u89E3\u9664\u3067\u304D\u307E\u305B\u3093\u3002\u5E74\u5EA6\u3068\u6708\u6B21\u306E\u4E21\u65B9\u304COPEN\u306E\u5834\u5408\u3060\u3051\u4ED5\u8A33\u3092\u66F4\u65B0\u3067\u304D\u307E\u3059\u3002" }),
             s.years.map((y) => /* @__PURE__ */ (0, import_jsx_runtime31.jsxs)("div", { className: "year-block", children: [
+              (0, import_jsx_runtime31.jsx)(OpeningBalances, { s, year: y, act, busy }, `${s.company.id}:${y.id}:${s.company.version}`),
               /* @__PURE__ */ (0, import_jsx_runtime31.jsxs)("h3", { children: [
                 y.start,
                 " \u301C ",
@@ -26099,7 +26174,7 @@ function AccountingApp() {
                 /* @__PURE__ */ (0, import_jsx_runtime31.jsx)(Download, { size: 16 }),
                 "\u518D\u53D6\u8FBC\u7528\u4ED5\u8A33CSV\uFF08ACTIVE\u30FB\u73FE\u884C\u5165\u529B\u660E\u7D30\uFF09"
               ] }),
-              /* @__PURE__ */ (0, import_jsx_runtime31.jsx)("p", { className: "muted", children: "\u518D\u53D6\u8FBC\u7528CSV\u306F\u81EA\u52D5\u7A0E\u660E\u7D30\u3092\u9664\u304D\u3001\u5165\u529B\u91D1\u984D\u3068\u4FDD\u5B58\u6E08\u307F\u7A0E\u984D\u3092\u542B\u307F\u307E\u3059\u3002\u5168\u660E\u7D30\u7248CSV\u306F\u524A\u9664\u6E08\u307F\u30FB\u904E\u53BB\u7248\u30FB\u81EA\u52D5\u7A0E\u660E\u7D30\u3092\u542B\u3080\u76E3\u67FB\u7528\u3067\u3059\u3002\u4F1D\u7968\u756A\u53F7\u306E\u306A\u3044\u8907\u5408\u4ED5\u8A33\u306Fimport_group\u3067\u307E\u3068\u3081\u308B\u5F62\u5F0F\u3067\u3059\u3002" }),
+              /* @__PURE__ */ (0, import_jsx_runtime31.jsx)("p", { className: "muted", children: "期首残高仕訳は再取込用CSVから除外されます。期首設定はJSONバックアップに含まれます。\u518D\u53D6\u8FBC\u7528CSV\u306F\u81EA\u52D5\u7A0E\u660E\u7D30\u3092\u9664\u304D\u3001\u5165\u529B\u91D1\u984D\u3068\u4FDD\u5B58\u6E08\u307F\u7A0E\u984D\u3092\u542B\u307F\u307E\u3059\u3002\u5168\u660E\u7D30\u7248CSV\u306F\u524A\u9664\u6E08\u307F\u30FB\u904E\u53BB\u7248\u30FB\u81EA\u52D5\u7A0E\u660E\u7D30\u3092\u542B\u3080\u76E3\u67FB\u7528\u3067\u3059\u3002\u4F1D\u7968\u756A\u53F7\u306E\u306A\u3044\u8907\u5408\u4ED5\u8A33\u306Fimport_group\u3067\u307E\u3068\u3081\u308B\u5F62\u5F0F\u3067\u3059\u3002" }),
               /* @__PURE__ */ (0, import_jsx_runtime31.jsx)("div", { className: "export-links", children: exports.map((x, i) => /* @__PURE__ */ (0, import_jsx_runtime31.jsxs)("a", { href: `/api/accounting?company=${s.company.id}&export=${x}`, children: [
                 ["\u4F1A\u793E\u8A2D\u5B9A", "\u5168\u4ED5\u8A33", "\u5168\u660E\u7D30\u7248", "\u52D8\u5B9A\u79D1\u76EE", "\u88DC\u52A9\u79D1\u76EE", "\u4F1A\u8A08\u5E74\u5EA6", "\u6708\u6B21\u671F\u9593", "\u76E3\u67FB\u30ED\u30B0", "\u7A0E\u533A\u5206"][i],
                 " CSV"
@@ -26108,7 +26183,7 @@ function AccountingApp() {
             ] }),
             /* @__PURE__ */ (0, import_jsx_runtime31.jsxs)("section", { className: "panel", children: [
               /* @__PURE__ */ (0, import_jsx_runtime31.jsx)("h2", { children: "\u5229\u7528\u7BC4\u56F2\u3068\u7FCC\u671F\u7E70\u8D8A" }),
-              /* @__PURE__ */ (0, import_jsx_runtime31.jsx)("p", { children: "\u524D\u671F\u307E\u3067\u306EB/S\u6B8B\u9AD8\u3092\u5F15\u304D\u7D99\u304E\u3001\u904E\u5E74\u5EA6\u306E\u640D\u76CA\u3092\u7E70\u8D8A\u5229\u76CA\u5270\u4F59\u91D1\u306B\u81EA\u52D5\u96C6\u8A08\u3057\u307E\u3059\u3002\u640D\u76CA\u632F\u66FF\u4ED5\u8A33\u3092\u91CD\u306D\u3066\u767B\u9332\u3057\u306A\u3044\u3067\u304F\u3060\u3055\u3044\u3002\u65E2\u5B58\u6CD5\u4EBA\u306E\u958B\u59CB\u6B8B\u9AD8\u306F\u6700\u521D\u306E\u5E74\u5EA6\u306E\u958B\u59CB\u65E5\u306B\u8CB8\u501F\u306E\u4E00\u81F4\u3057\u305F\u4ED5\u8A33\u3068\u3057\u3066\u767B\u9332\u3057\u307E\u3059\u3002" }),
+              /* @__PURE__ */ (0, import_jsx_runtime31.jsx)("p", { children: "\u524D\u671F\u307E\u3067\u306EB/S\u6B8B\u9AD8\u3092\u5F15\u304D\u7D99\u304E\u3001\u904E\u5E74\u5EA6\u306E\u640D\u76CA\u3092\u7E70\u8D8A\u5229\u76CA\u5270\u4F59\u91D1\u306B\u81EA\u52D5\u96C6\u8A08\u3057\u307E\u3059\u3002\u640D\u76CA\u632F\u66FF\u4ED5\u8A33\u3092\u91CD\u306D\u3066\u767B\u9332\u3057\u306A\u3044\u3067\u304F\u3060\u3055\u3044\u3002期首残高は「会計期間」の各年度にある専用設定で入力できます。繰越残高との差額だけを期首残高仕訳として保存します。既存の開始残高仕訳は自動変換されません。" }),
               /* @__PURE__ */ (0, import_jsx_runtime31.jsx)("p", { children: "\u7A0E\u629C\u30FB\u7A0E\u8FBC\u5165\u529B\u306B\u5BFE\u5FDC\u3057\u307E\u3059\u3002\u7A0E\u60C5\u5831\u672A\u8A2D\u5B9A\u306E\u904E\u53BB\u4ED5\u8A33\u306F\u5F93\u6765\u91D1\u984D\u3092\u4FDD\u6301\u3057\u307E\u3059\u3002\u7533\u544A\u66F8\u4F5C\u6210\u30FB\u8A3C\u6191\u4FDD\u5B58\u306E\u6CD5\u4EE4\u5BFE\u5FDC\u306F\u542B\u307F\u307E\u305B\u3093\u3002\u521D\u5E74\u5EA6\u306E\u671F\u9593\u4F5C\u6210\u3068\u4F1A\u8A08\u79D1\u76EE\u3092\u78BA\u8A8D\u3057\u3066\u304B\u3089\u5B9F\u30C7\u30FC\u30BF\u3092\u5165\u529B\u3057\u3066\u304F\u3060\u3055\u3044\u3002" }),
               /* @__PURE__ */ (0, import_jsx_runtime31.jsx)(Button, { variant: "outline", onClick: () => setModal({ type: "create", name: "", start: "2026-04-01", end: "2027-03-31" }), children: "\u5225\u306E\u4F1A\u793E\u3092\u767B\u9332" }),
               /* @__PURE__ */ (0, import_jsx_runtime31.jsx)(Button, { variant: "outline", disabled: busy, onClick: () => {

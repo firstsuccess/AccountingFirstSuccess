@@ -47,6 +47,7 @@ function open(s, d) {
   return y;
 }
 function canEdit(s, j) {
+  if (j.journal_kind === "OPENING") return false;
   try {
     open(s, j.transaction_date);
     return j.status === "ACTIVE";
@@ -94,13 +95,66 @@ function createCompany(user, name, start, end, test = false) {
   log(s, user, "ACCOUNT_INITIALIZE", "accounts", s.company.id, null, s.accounts);
   return s;
 }
+function openingPlan(s, yearId, balances) {
+  const y = s.years.find((year) => year.id === yearId);
+  assert(y, "会計年度が見つかりません");
+  const existing = s.journals.filter((j) => j.status === "ACTIVE" && j.year_id === y.id && j.journal_kind === "OPENING");
+  assert(existing.length <= 1, "期首残高仕訳が重複しています");
+  const old = existing[0];
+  const baseline = reports({ ...s, journals: s.journals.filter((j) => j.id !== old?.id) }, y.start, y.start).rows;
+  const accounts = baseline.filter((a) => a.statement_type === "BS");
+  const rows = accounts.map((a) => {
+    const adjustment = old ? currentLines(s, old).filter((l) => l.account_id === a.id).reduce((n, l) => n + BigInt(l.debit_amount) - BigInt(l.credit_amount), 0n) : 0n;
+    return { ...a, baseline: a.opening, target: String(BigInt(a.opening) + adjustment) };
+  });
+  if (!balances) return { year: y, old, rows };
+  assert(Array.isArray(balances) && balances.length === accounts.length, "全BS科目の期首残高を指定してください");
+  assert(new Set(balances.map((b) => b.account_id)).size === accounts.length, "勘定科目が重複しています");
+  let targetTotal = 0n;
+  const targets = balances.map((b) => {
+    const a = rows.find((a) => a.id === b.account_id);
+    assert(a, "BS科目だけを指定してください");
+    const debit = amount(b.debit_amount || 0), credit = amount(b.credit_amount || 0);
+    assert(!debit || !credit, "同じ科目の借方・貸方を同時に入力できません");
+    const target = BigInt(debit) - BigInt(credit), delta = target - BigInt(a.baseline);
+    assert(a.active || target === BigInt(a.target), "無効科目の期首残高は変更できません");
+    targetTotal += target;
+    return { ...a, target: String(target), delta: String(delta) };
+  });
+  assert(targetTotal === 0n, "期首残高の貸借が一致していません");
+  const lines = targets.filter((a) => BigInt(a.delta) !== 0n).map((a) => ({ account_id: a.id, debit_amount: amount(BigInt(a.delta) > 0n ? a.delta : "0"), credit_amount: amount(BigInt(a.delta) < 0n ? String(-BigInt(a.delta)) : "0"), tax_code: "UNSPECIFIED", line_description: "期首残高の差額調整" }));
+  assert(lines.reduce((n, l) => n + BigInt(l.debit_amount) - BigInt(l.credit_amount), 0n) === 0n, "繰越残高の貸借が一致していません。元データを確認してください");
+  return { year: y, old, rows: targets, lines, changed: targets.some((a) => a.target !== rows.find((r) => r.id === a.id).target) };
+}
 function mutate(input, command, user) {
   assert(input.company.owner === user, "\u3053\u306E\u4F1A\u793E\u3078\u306E\u6A29\u9650\u304C\u3042\u308A\u307E\u305B\u3093");
-  const s = structuredClone(input), c = command;
+  const s = structuredClone(input);
+  let c = command;
   s.tax_codes ||= [];
   const now = (/* @__PURE__ */ new Date()).toISOString();
+  const isOpening = c.type === "opening";
+  let plan;
+  if (isOpening) {
+    plan = openingPlan(s, c.year_id, c.balances);
+    open(s, plan.year.start);
+    assert(!s.journals.some((j) => j.status === "ACTIVE" && j.transaction_date === plan.year.start && j.journal_kind !== "OPENING") || c.confirm_start_journals === true, "期首日の通常仕訳を確認して、開始残高の重複がないことを確認してください");
+    assert(s.years.filter((y) => y.end < plan.year.start).every((y) => y.status === "LOCKED"), "前年度までをLOCKしてから期首残高を設定してください");
+    assert(!s.years.some((y) => y.start > plan.year.start && (y.status !== "OPEN" || s.periods.some((p) => p.year_id === y.id && p.status !== "OPEN"))), "後続年度に確定期間があるため期首残高を変更できません");
+    assert(!s.journals.some((j) => j.status === "ACTIVE" && j.journal_kind === "OPENING" && j.transaction_date > plan.year.start), "後続年度の期首残高設定があるため変更できません");
+    const reason = str(c.reason);
+    assert(plan.changed, "期首残高に変更がありません。保存は不要です");
+    if (!plan.lines.length && plan.old) {
+      const before = structuredClone(plan.old);
+      Object.assign(plan.old, { status: "DELETED", deleted_at: now, deleted_by: user, delete_reason: reason, updated_at: now, updated_by: user });
+      log(s, user, "OPENING_RESET", "journals", plan.old.id, before, plan.old, reason);
+      s.company.version++;
+      return s;
+    }
+    c = { type: "journal", id: plan.old?.id, transaction_date: plan.year.start, description: "期首残高の差額調整", journal_kind: "OPENING", lines: plan.lines, reason };
+  }
   if (c.type === "journal") {
     let old = s.journals.find((j2) => j2.id === c.id);
+    assert(isOpening || (old?.journal_kind !== "OPENING" && c.journal_kind !== "OPENING"), "期首残高は専用画面で設定してください");
     assert(!c.id || old, "\u4ED5\u8A33\u304C\u898B\u3064\u304B\u308A\u307E\u305B\u3093");
     if (old) {
       assert(old.status === "ACTIVE", "\u524A\u9664\u6E08\u307F\u4ED5\u8A33\u306F\u7DE8\u96C6\u3067\u304D\u307E\u305B\u3093");
@@ -112,15 +166,16 @@ function mutate(input, command, user) {
     const expanded = expandTaxLines(s, c.lines, c.transaction_date, old ? currentLines(s, old) : [], old?.transaction_date);
     const ls = expanded.map((l) => {
       const a = s.accounts.find((a2) => a2.id === l.account_id);
-      assert(a?.active, "\u6709\u52B9\u306A\u52D8\u5B9A\u79D1\u76EE\u3092\u9078\u629E\u3057\u3066\u304F\u3060\u3055\u3044");
+      assert(a?.active || isOpening && plan.rows.some((r) => r.id === a?.id && !r.active), "\u6709\u52B9\u306A\u52D8\u5B9A\u79D1\u76EE\u3092\u9078\u629E\u3057\u3066\u304F\u3060\u3055\u3044");
       const sub = l.subaccount_id ? s.subaccounts.find((a2) => a2.id === l.subaccount_id) : null;
       assert(!l.subaccount_id || sub?.active && sub.account_id === a.id, "\u88DC\u52A9\u79D1\u76EE\u306E\u6240\u5C5E\u30FB\u6709\u52B9\u72B6\u614B\u304C\u4E0D\u6B63\u3067\u3059");
       return { id: l.id, journal_id: id, revision: rev, account_id: a.id, subaccount_id: sub?.id || null, debit_amount: l.debit_amount, credit_amount: l.credit_amount, line_description: String(l.line_description || "").slice(0, 300), ...Object.fromEntries(taxFields.map((k) => [k, l[k] ?? null])), entry_side: l.entry_side || null, is_tax_line: l.is_tax_line, tax_source_line_id: l.tax_source_line_id };
     });
     assert(sum(ls, "debit_amount") === sum(ls, "credit_amount"), "\u8CB8\u501F\u304C\u4E00\u81F4\u3057\u3066\u3044\u307E\u305B\u3093");
     const journal_kind = c.journal_kind || old?.journal_kind || "STANDARD";
-    assert(["STANDARD", "TAX_SETTLEMENT", "TAX_PAYMENT"].includes(journal_kind), "\u4ED5\u8A33\u7A2E\u5225\u304C\u4E0D\u6B63\u3067\u3059");
+    assert(["STANDARD", "TAX_SETTLEMENT", "TAX_PAYMENT", ...(isOpening ? ["OPENING"] : [])].includes(journal_kind), "\u4ED5\u8A33\u7A2E\u5225\u304C\u4E0D\u6B63\u3067\u3059");
     const j = { journal_kind, id, journal_number: old?.journal_number || allocateNumber(s, c.import_number), transaction_date: c.transaction_date, year_id: y.id, description: str(c.description), counterparty: String(c.counterparty || "").slice(0, 300), status: "ACTIVE", revision: rev, created_at: old?.created_at || now, created_by: old?.created_by || user, updated_at: now, updated_by: user, deleted_at: null, deleted_by: null, delete_reason: null, source_type: old?.source_type || "MANUAL", source_id: null };
+    if (isOpening) j.opening_targets = plan.rows.map((a) => ({ account_id: a.id, baseline: a.baseline, target: a.target }));
     const before = old ? { header: old, lines: currentLines(s, old) } : null;
     if (old)
       s.journals[s.journals.indexOf(old)] = j;
@@ -133,6 +188,7 @@ function mutate(input, command, user) {
     if (journal_kind !== "STANDARD") log(s, user, journal_kind, "journals", id, before, { header: j, lines: ls }, c.reason || j.description);
   } else if (c.type === "delete") {
     const j = s.journals.find((j2) => j2.id === c.id);
+    assert(j?.journal_kind !== "OPENING", "期首残高は専用画面で変更してください");
     assert(j && j.status === "ACTIVE", "\u6709\u52B9\u306A\u4ED5\u8A33\u304C\u898B\u3064\u304B\u308A\u307E\u305B\u3093");
     open(s, j.transaction_date);
     const before = structuredClone(j);
@@ -144,6 +200,10 @@ function mutate(input, command, user) {
     j.updated_by = user;
     log(s, user, "JOURNAL_DELETE", "journals", j.id, before, j, j.delete_reason);
   } else if (c.type === "period") {
+    if (c.status === "OPEN") {
+      const target = s[c.target]?.find((p) => p.id === c.id);
+      assert(!target || !s.journals.some((j) => j.status === "ACTIVE" && j.journal_kind === "OPENING" && j.transaction_date > target.end), "後続年度の期首残高設定があるため再OPENできません");
+    }
     assert(c.target === "years" || c.target === "periods", "\u671F\u9593\u7A2E\u5225\u304C\u4E0D\u6B63\u3067\u3059");
     const p = s[c.target].find((p2) => p2.id === c.id);
     assert(p, "\u671F\u9593\u304C\u898B\u3064\u304B\u308A\u307E\u305B\u3093");
@@ -254,7 +314,7 @@ function mutate(input, command, user) {
   return s;
 }
 function postingLines(s, end = "9999-12-31") {
-  return s.journals.filter((j) => j.status === "ACTIVE" && j.transaction_date <= end).flatMap((j) => currentLines(s, j).map((l) => ({ ...l, date: j.transaction_date, journal_number: j.journal_number, description: j.description })));
+  return s.journals.filter((j) => j.status === "ACTIVE" && j.transaction_date <= end).flatMap((j) => currentLines(s, j).map((l) => ({ ...l, date: j.transaction_date, journal_number: j.journal_number, description: j.description, journal_kind: j.journal_kind, year_id: j.year_id })));
 }
 function reports(s, start, end) {
   date(start);
@@ -265,11 +325,11 @@ function reports(s, start, end) {
   const ls = postingLines(s, end);
   const rows = s.accounts.map((a) => {
     const mine = ls.filter((l) => l.account_id === a.id);
-    let opening = mine.filter((l) => l.date < start && (a.statement_type === "BS" || l.date >= y.start)).reduce((n, l) => n + BigInt(l.debit_amount) - BigInt(l.credit_amount), 0n);
+    let opening = mine.filter((l) => (l.date < start || l.journal_kind === "OPENING" && l.year_id === y.id) && (a.statement_type === "BS" || l.date >= y.start)).reduce((n, l) => n + BigInt(l.debit_amount) - BigInt(l.credit_amount), 0n);
     if (a.tag === "RETAINED") {
       opening += ls.filter((l) => l.date < y.start && s.accounts.find((a2) => a2.id === l.account_id)?.statement_type === "PL").reduce((n, l) => n + BigInt(l.credit_amount) - BigInt(l.debit_amount), 0n) * -1n;
     }
-    const period = mine.filter((l) => l.date >= start), debit = sum(period, "debit_amount"), credit = sum(period, "credit_amount");
+    const period = mine.filter((l) => l.date >= start && !(l.journal_kind === "OPENING" && l.year_id === y.id)), debit = sum(period, "debit_amount"), credit = sum(period, "credit_amount");
     return { ...a, opening: opening.toString(), debit: debit.toString(), credit: credit.toString(), closing: (opening + debit - credit).toString() };
   });
   const groups = {};
@@ -289,7 +349,7 @@ function ledger(s, accountId, start, end) {
   const r = reports(s, start, end), a = r.rows.find((a2) => a2.id === accountId);
   assert(a, "\u79D1\u76EE\u3092\u9078\u629E\u3057\u3066\u304F\u3060\u3055\u3044");
   let balance = BigInt(a.opening);
-  const rows = postingLines(s, end).filter((l) => l.account_id === accountId && l.date >= start).sort((a2, b) => a2.date.localeCompare(b.date) || a2.journal_number.localeCompare(b.journal_number) || a2.id.localeCompare(b.id)).map((l) => {
+  const rows = postingLines(s, end).filter((l) => l.account_id === accountId && l.date >= start && l.journal_kind !== "OPENING").sort((a2, b) => a2.date.localeCompare(b.date) || a2.journal_number.localeCompare(b.journal_number) || a2.id.localeCompare(b.id)).map((l) => {
     balance += BigInt(l.debit_amount) - BigInt(l.credit_amount);
     const j = s.journals.find((j2) => j2.id === l.journal_id);
     const opposite = currentLines(s, j).filter((x) => l.debit_amount > 0 ? x.credit_amount > 0 : x.debit_amount > 0).map((x) => s.accounts.find((a2) => a2.id === x.account_id)?.account_name).filter((x, i, arr) => arr.indexOf(x) === i);
@@ -336,6 +396,7 @@ export {
   mutate,
   postingLines,
   reports,
+  openingPlan,
   sectionTypes,
   sections,
   seedTest,

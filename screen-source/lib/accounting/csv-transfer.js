@@ -6,7 +6,7 @@ function context(s, j, l) {
   return { company_id: s.company.id, company_name: s.company.name, journal_number: j.journal_number, transaction_date: j.transaction_date, description: j.description, counterparty: j.counterparty, journal_status: j.status, journal_kind: j.journal_kind || "STANDARD", account_code: account?.account_code, account_name: account?.account_name, subaccount_name: sub?.name || "" };
 }
 function transferRows(s) {
-  return s.journals.filter((j) => j.status === "ACTIVE").flatMap((j) => currentLines(s, j).filter((l) => !l.is_tax_line).map((l) => ({
+  return s.journals.filter((j) => j.status === "ACTIVE" && j.journal_kind !== "OPENING").flatMap((j) => currentLines(s, j).filter((l) => !l.is_tax_line).map((l) => ({
     ...l,
     ...context(s, j, l),
     line_id: l.id,

@@ -1,6 +1,7 @@
 "use client";
 import { Fragment, jsx, jsxs } from "react/jsx-runtime";
 import { useEffect, useMemo, useState } from "react";
+import { OpeningBalances } from "./opening-balances";
 import { CSVImport } from "./csv-import";
 import { TaxLineEditor, TaxWorkspace, TaxDetails, editorLines } from "./tax-ui";
 import { BookOpen, LayoutDashboard, PenLine, List, BookText, Scale, ChartNoAxesCombined, Landmark, Tags, FolderTree, CalendarDays, History, Settings, Download, Plus, CheckCircle2, ShieldCheck, RefreshCw } from "lucide-react";
@@ -407,6 +408,7 @@ function AccountingApp() {
             ] }),
             /* @__PURE__ */ jsx("p", { className: "muted", children: "CLOSED\u306F\u7406\u7531\u3092\u8A18\u9332\u3057\u3066\u518DOPEN\u3067\u304D\u307E\u3059\u3002LOCKED\u306F\u89E3\u9664\u3067\u304D\u307E\u305B\u3093\u3002\u5E74\u5EA6\u3068\u6708\u6B21\u306E\u4E21\u65B9\u304COPEN\u306E\u5834\u5408\u3060\u3051\u4ED5\u8A33\u3092\u66F4\u65B0\u3067\u304D\u307E\u3059\u3002" }),
             s.years.map((y) => /* @__PURE__ */ jsxs("div", { className: "year-block", children: [
+              jsx(OpeningBalances, { s, year: y, act, busy }, `${s.company.id}:${y.id}:${s.company.version}`),
               /* @__PURE__ */ jsxs("h3", { children: [
                 y.start,
                 " \u301C ",
@@ -449,7 +451,7 @@ function AccountingApp() {
                 /* @__PURE__ */ jsx(Download, { size: 16 }),
                 "\u518D\u53D6\u8FBC\u7528\u4ED5\u8A33CSV\uFF08ACTIVE\u30FB\u73FE\u884C\u5165\u529B\u660E\u7D30\uFF09"
               ] }),
-              /* @__PURE__ */ jsx("p", { className: "muted", children: "\u518D\u53D6\u8FBC\u7528CSV\u306F\u81EA\u52D5\u7A0E\u660E\u7D30\u3092\u9664\u304D\u3001\u5165\u529B\u91D1\u984D\u3068\u4FDD\u5B58\u6E08\u307F\u7A0E\u984D\u3092\u542B\u307F\u307E\u3059\u3002\u5168\u660E\u7D30\u7248CSV\u306F\u524A\u9664\u6E08\u307F\u30FB\u904E\u53BB\u7248\u30FB\u81EA\u52D5\u7A0E\u660E\u7D30\u3092\u542B\u3080\u76E3\u67FB\u7528\u3067\u3059\u3002\u4F1D\u7968\u756A\u53F7\u306E\u306A\u3044\u8907\u5408\u4ED5\u8A33\u306Fimport_group\u3067\u307E\u3068\u3081\u308B\u5F62\u5F0F\u3067\u3059\u3002" }),
+              /* @__PURE__ */ jsx("p", { className: "muted", children: "期首残高仕訳は再取込用CSVから除外されます。期首設定はJSONバックアップに含まれます。\u518D\u53D6\u8FBC\u7528CSV\u306F\u81EA\u52D5\u7A0E\u660E\u7D30\u3092\u9664\u304D\u3001\u5165\u529B\u91D1\u984D\u3068\u4FDD\u5B58\u6E08\u307F\u7A0E\u984D\u3092\u542B\u307F\u307E\u3059\u3002\u5168\u660E\u7D30\u7248CSV\u306F\u524A\u9664\u6E08\u307F\u30FB\u904E\u53BB\u7248\u30FB\u81EA\u52D5\u7A0E\u660E\u7D30\u3092\u542B\u3080\u76E3\u67FB\u7528\u3067\u3059\u3002\u4F1D\u7968\u756A\u53F7\u306E\u306A\u3044\u8907\u5408\u4ED5\u8A33\u306Fimport_group\u3067\u307E\u3068\u3081\u308B\u5F62\u5F0F\u3067\u3059\u3002" }),
               /* @__PURE__ */ jsx("div", { className: "export-links", children: exports.map((x, i) => /* @__PURE__ */ jsxs("a", { href: `/api/accounting?company=${s.company.id}&export=${x}`, children: [
                 ["\u4F1A\u793E\u8A2D\u5B9A", "\u5168\u4ED5\u8A33", "\u5168\u660E\u7D30\u7248", "\u52D8\u5B9A\u79D1\u76EE", "\u88DC\u52A9\u79D1\u76EE", "\u4F1A\u8A08\u5E74\u5EA6", "\u6708\u6B21\u671F\u9593", "\u76E3\u67FB\u30ED\u30B0", "\u7A0E\u533A\u5206"][i],
                 " CSV"
@@ -458,7 +460,7 @@ function AccountingApp() {
             ] }),
             /* @__PURE__ */ jsxs("section", { className: "panel", children: [
               /* @__PURE__ */ jsx("h2", { children: "\u5229\u7528\u7BC4\u56F2\u3068\u7FCC\u671F\u7E70\u8D8A" }),
-              /* @__PURE__ */ jsx("p", { children: "\u524D\u671F\u307E\u3067\u306EB/S\u6B8B\u9AD8\u3092\u5F15\u304D\u7D99\u304E\u3001\u904E\u5E74\u5EA6\u306E\u640D\u76CA\u3092\u7E70\u8D8A\u5229\u76CA\u5270\u4F59\u91D1\u306B\u81EA\u52D5\u96C6\u8A08\u3057\u307E\u3059\u3002\u640D\u76CA\u632F\u66FF\u4ED5\u8A33\u3092\u91CD\u306D\u3066\u767B\u9332\u3057\u306A\u3044\u3067\u304F\u3060\u3055\u3044\u3002\u65E2\u5B58\u6CD5\u4EBA\u306E\u958B\u59CB\u6B8B\u9AD8\u306F\u6700\u521D\u306E\u5E74\u5EA6\u306E\u958B\u59CB\u65E5\u306B\u8CB8\u501F\u306E\u4E00\u81F4\u3057\u305F\u4ED5\u8A33\u3068\u3057\u3066\u767B\u9332\u3057\u307E\u3059\u3002" }),
+              /* @__PURE__ */ jsx("p", { children: "\u524D\u671F\u307E\u3067\u306EB/S\u6B8B\u9AD8\u3092\u5F15\u304D\u7D99\u304E\u3001\u904E\u5E74\u5EA6\u306E\u640D\u76CA\u3092\u7E70\u8D8A\u5229\u76CA\u5270\u4F59\u91D1\u306B\u81EA\u52D5\u96C6\u8A08\u3057\u307E\u3059\u3002\u640D\u76CA\u632F\u66FF\u4ED5\u8A33\u3092\u91CD\u306D\u3066\u767B\u9332\u3057\u306A\u3044\u3067\u304F\u3060\u3055\u3044\u3002期首残高は「会計期間」の各年度にある専用設定で入力できます。繰越残高との差額だけを期首残高仕訳として保存します。既存の開始残高仕訳は自動変換されません。" }),
               /* @__PURE__ */ jsx("p", { children: "\u7A0E\u629C\u30FB\u7A0E\u8FBC\u5165\u529B\u306B\u5BFE\u5FDC\u3057\u307E\u3059\u3002\u7A0E\u60C5\u5831\u672A\u8A2D\u5B9A\u306E\u904E\u53BB\u4ED5\u8A33\u306F\u5F93\u6765\u91D1\u984D\u3092\u4FDD\u6301\u3057\u307E\u3059\u3002\u7533\u544A\u66F8\u4F5C\u6210\u30FB\u8A3C\u6191\u4FDD\u5B58\u306E\u6CD5\u4EE4\u5BFE\u5FDC\u306F\u542B\u307F\u307E\u305B\u3093\u3002\u521D\u5E74\u5EA6\u306E\u671F\u9593\u4F5C\u6210\u3068\u4F1A\u8A08\u79D1\u76EE\u3092\u78BA\u8A8D\u3057\u3066\u304B\u3089\u5B9F\u30C7\u30FC\u30BF\u3092\u5165\u529B\u3057\u3066\u304F\u3060\u3055\u3044\u3002" }),
               /* @__PURE__ */ jsx(Button, { variant: "outline", onClick: () => setModal({ type: "create", name: "", start: "2026-04-01", end: "2027-03-31" }), children: "\u5225\u306E\u4F1A\u793E\u3092\u767B\u9332" }),
               /* @__PURE__ */ jsx(Button, { variant: "outline", disabled: busy, onClick: () => {
