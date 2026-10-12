@@ -1,0 +1,11 @@
+import {scryptSync,randomBytes} from 'node:crypto';
+import fs from 'node:fs';
+import readline from 'node:readline/promises';
+const rl=readline.createInterface({input:process.stdin,output:process.stdout});
+const username=await rl.question('Login username: '),owner=await rl.question('Existing companies.owner value: '),displayName=await rl.question('Display name: ');
+console.log('Password is read from APP_PASSWORD environment variable; do not put it in command arguments.');
+rl.close();const password=process.env.APP_PASSWORD;
+if(!username||!owner||!password||password.length<16)throw new Error('User, owner and a password of at least 16 characters are required');
+if(fs.existsSync('users.json'))throw new Error('users.json already exists; not overwritten');
+const salt=randomBytes(32).toString('hex'),hash=scryptSync(password,salt,64).toString('hex');
+fs.writeFileSync('users.json',JSON.stringify([{username,owner,displayName,salt,hash}],null,2),{mode:0o600});console.log('users.json created.');

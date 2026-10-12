@@ -1,0 +1,34 @@
+{
+  "version": "7",
+  "dialect": "sqlite",
+  "entries": [
+    {
+      "idx": 0,
+      "version": "6",
+      "when": 1789448333470,
+      "tag": "0000_overconfident_naoko",
+      "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "6",
+      "when": 1789448710630,
+      "tag": "0001_accounting_guards",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "6",
+      "when": 1789455221977,
+      "tag": "0002_tiresome_inertia",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "6",
+      "when": 1789455261558,
+      "tag": "0003_tax_guards",
+      "breakpoints": true
+    }
+  ]
+}

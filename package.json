@@ -1,0 +1,17 @@
+{
+  "name": "monja-accounting-windows",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "start": "node --env-file=.env server.js",
+    "import": "node --env-file=.env scripts/import-data.js",
+    "check": "node --check server.js"
+  },
+  "dependencies": {
+    "mssql": "^12.0.0"
+  }
+}
