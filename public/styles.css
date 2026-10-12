@@ -6181,6 +6181,10 @@ a:hover {
   font-size: 14px;
 }
 .topbar {
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  flex-wrap: wrap;
   min-height: 72px;
   background: white;
   border-bottom: 1px solid #dbe3ec;
@@ -6189,6 +6193,17 @@ a:hover {
   align-items: center;
   padding: 14px 28px;
   gap: 12px;
+}
+.topbar > .row {
+  flex: 1;
+  min-width: 0;
+}
+.topbar .logout-button {
+  flex-shrink: 0;
+  margin-left: auto;
+}
+@media (max-width:640px) {
+  .topbar > .row { flex-basis: 100%; }
 }
 .row {
   display: flex;

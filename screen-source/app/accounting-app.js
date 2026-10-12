@@ -169,8 +169,8 @@ function AccountingApp() {
       /* @__PURE__ */ jsxs(SidebarHeader, { className: "brand", children: [
         /* @__PURE__ */ jsx(BookOpen, {}),
         /* @__PURE__ */ jsxs("div", { children: [
-          "\u6CD5\u4EBA\u306E\u4F1A\u8A08\u5E33\u7C3F",
-          /* @__PURE__ */ jsx("small", { children: "\u65E5\u5E38\u7D4C\u7406 / Phase 1" })
+          "会計帳簿",
+          /* @__PURE__ */ jsx("small", { children: "/ Ver 0.1" })
         ] })
       ] }),
       /* @__PURE__ */ jsx(SidebarContent, { children: /* @__PURE__ */ jsx(SidebarMenu, { children: nav.map(([name, Icon]) => /* @__PURE__ */ jsx(SidebarMenuItem, { children: /* @__PURE__ */ jsxs(SidebarMenuButton, { isActive: page === name, onClick: () => go(name), children: [
@@ -180,7 +180,7 @@ function AccountingApp() {
       /* @__PURE__ */ jsxs(SidebarFooter, { children: [
         /* @__PURE__ */ jsxs("div", { className: "private-note", children: [
           /* @__PURE__ */ jsx(ShieldCheck, { size: 16 }),
-          "\u975E\u516C\u958B\u306E\u4F1A\u8A08\u5E33\u7C3F"
+          "©ﾌｧｰｽﾄｻｸｾｽ合同会社"
         ] }),
         /* @__PURE__ */ jsx("small", { children: user })
       ] })
@@ -191,11 +191,18 @@ function AccountingApp() {
           /* @__PURE__ */ jsx(SidebarTrigger, {}),
           /* @__PURE__ */ jsx("span", { className: "muted", children: "\u30EF\u30FC\u30AF\u30B9\u30DA\u30FC\u30B9" }),
           /* @__PURE__ */ jsx(Choice, { label: "\u4F1A\u793E", value: s?.company.id || "", onChange: (id) => loadCompany(id), options: companies.length ? companies.map((c) => [c.id, c.name + (c.test ? "\uFF08\u30C6\u30B9\u30C8\uFF09" : "")]) : [["", "\u4F1A\u793E\u672A\u767B\u9332"]] })
-        ] }),
+      ] }),
         /* @__PURE__ */ jsxs(Button, { variant: "outline", disabled: busy, onClick: () => s && loadCompany(s.company.id, false), children: [
           /* @__PURE__ */ jsx(RefreshCw, { size: 15 }),
           "\u518D\u8AAD\u8FBC"
         ] })
+          , /* @__PURE__ */ jsx(Button, { variant: "outline", className: "logout-button", onClick: async () => {
+          try {
+            const response = await fetch("/api/logout", { method: "POST" });
+            if (!response.ok) { const result = await response.json().catch(() => ({})); throw new Error(result.error || `ログアウトできませんでした（HTTP ${response.status}）`); }
+            window.location.replace("/login");
+          } catch (error) { setError(error.message || "ログアウトできませんでした"); }
+        }, children: "ログアウト" })
       ] }),
       /* @__PURE__ */ jsxs("main", { className: "workspace", children: [
         /* @__PURE__ */ jsxs("div", { className: "page-heading", children: [
