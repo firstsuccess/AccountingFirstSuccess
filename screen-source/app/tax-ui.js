@@ -1,7 +1,7 @@
 "use client";
 import { Fragment, jsx, jsxs } from "react/jsx-runtime";
 import { useState } from "react";
-import { currentLines } from "@/lib/accounting/core";
+import { currentLines, orderedTaxCodes } from "@/lib/accounting/core";
 import { expandTaxLines, calculateTax, taxReport, taxTypes, roundingNames } from "@/lib/accounting/tax";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -69,7 +69,7 @@ function TaxLineEditor({ s, editor, setEditor }) {
           /* @__PURE__ */ jsx(TableCell, { children: /* @__PURE__ */ jsx(Choose, { label: "\u501F\u8CB8", value: side, options: [["DEBIT", "\u501F\u65B9"], ["CREDIT", "\u8CB8\u65B9"]], onChange: (v) => update({ entry_side: v, debit_amount: v === "DEBIT" ? value : 0, credit_amount: v === "CREDIT" ? value : 0 }) }) }),
           /* @__PURE__ */ jsx(TableCell, { children: /* @__PURE__ */ jsx(Choose, { label: "\u5165\u529B\u65B9\u5F0F", value: l.amount_input_type || "NET", options: [["NET", "\u7A0E\u629C"], ["GROSS", "\u7A0E\u8FBC"]], onChange: (v) => update({ amount_input_type: v }) }) }),
           /* @__PURE__ */ jsxs(TableCell, { children: [
-            /* @__PURE__ */ jsx(Choose, { label: "\u7A0E\u533A\u5206", value: l.tax_code || "UNSPECIFIED", options: [["UNSPECIFIED", "\u7A0E\u60C5\u5831\u672A\u8A2D\u5B9A"], ...s.tax_codes.filter((t) => t.active || t.tax_code === l.tax_code).map((t) => [t.tax_code, t.tax_name + (t.active ? "" : "\uFF08\u7121\u52B9\uFF09")])], onChange: (v) => update({ tax_code: v, tax_override: "", tax_adjustment_reason: "" }) }),
+            /* @__PURE__ */ jsx(Choose, { label: "\u7A0E\u533A\u5206", value: l.tax_code || "UNSPECIFIED", options: [["UNSPECIFIED", "\u7A0E\u60C5\u5831\u672A\u8A2D\u5B9A"], ...orderedTaxCodes(s).filter((t) => t.active || t.tax_code === l.tax_code).map((t) => [t.tax_code, t.tax_name + (t.active ? "" : "\uFF08\u7121\u52B9\uFF09")])], onChange: (v) => update({ tax_code: v, tax_override: "", tax_adjustment_reason: "" }) }),
             /* @__PURE__ */ jsx("small", { children: calc?.tax_rate != null ? `${calc.tax_rate}%\uFF08\u4FDD\u5B58\u6642\u70B9\uFF09` : "\u7A0E\u7387\u672A\u8A2D\u5B9A" })
           ] }),
           /* @__PURE__ */ jsx(TableCell, { children: /* @__PURE__ */ jsx(Input, { "aria-label": `${i + 1}\u884C\u76EE\u306E\u5165\u529B\u91D1\u984D`, type: "number", min: "1", step: "1", value: value || "", onChange: (e) => update({ debit_amount: side === "DEBIT" ? e.target.value : 0, credit_amount: side === "CREDIT" ? e.target.value : 0 }) }) }),
@@ -133,6 +133,13 @@ function TaxDetails({ lines }) {
 }
 function TaxWorkspace({ s, start, end, page, act, onPrepare }) {
   const [form, setForm] = useState(null), [busy, setBusy] = useState(false), [error, setError] = useState("");
+  function moveTaxCode(index, direction) {
+    const ids = orderedTaxCodes(s).map((t) => t.id);
+    const next = index + direction;
+    if (busy || next < 0 || next >= ids.length) return;
+    [ids[index], ids[next]] = [ids[next], ids[index]];
+    submit({ type: "tax_order", ids });
+  }
   async function submit(c) {
     setBusy(true);
     setError("");
@@ -207,7 +214,7 @@ function TaxWorkspace({ s, start, end, page, act, onPrepare }) {
           /* @__PURE__ */ jsx(Button, { onClick: () => setForm({ type: "tax_code", tax_code: "", tax_name: "", tax_type: "SALES", tax_rate: "10", effective_from: "2026-01-01", effective_to: "", active: true, reason: "" }), children: "\u65B0\u3057\u3044\u7A0E\u533A\u5206" })
         ] }),
         /* @__PURE__ */ jsx("p", { className: "muted", children: "\u7A0E\u7387\u30FB\u7A2E\u5225\u30FB\u30B3\u30FC\u30C9\u306F\u4F5C\u6210\u5F8C\u306B\u4E0A\u66F8\u304D\u3067\u304D\u307E\u305B\u3093\u3002\u7A0E\u7387\u5909\u66F4\u306F\u65B0\u3057\u3044\u533A\u5206\u3092\u8FFD\u52A0\u3057\u3066\u304F\u3060\u3055\u3044\u3002" }),
-        /* @__PURE__ */ jsx(DataTable, { heads: ["\u30B3\u30FC\u30C9", "\u540D\u79F0", "\u7A2E\u5225", "\u7A0E\u7387", "\u9069\u7528\u671F\u9593", "\u72B6\u614B", "\u64CD\u4F5C"], rows: s.tax_codes.map((t) => [t.tax_code, t.tax_name, taxTypes[t.tax_type], `${t.tax_rate}%`, `${t.effective_from} \u301C ${t.effective_to || "\u671F\u9650\u306A\u3057"}`, t.active ? "\u6709\u52B9" : "\u7121\u52B9", /* @__PURE__ */ jsx(Button, { variant: "ghost", onClick: () => setForm({ ...t, type: "tax_code", effective_to: t.effective_to || "", reason: "" }), children: "\u5909\u66F4" })]) })
+        /* @__PURE__ */ jsx(DataTable, { heads: ["\u30B3\u30FC\u30C9", "\u540D\u79F0", "\u7A2E\u5225", "\u7A0E\u7387", "\u9069\u7528\u671F\u9593", "\u72B6\u614B", "\u64CD\u4F5C"], rows: orderedTaxCodes(s).map((t, index) => [t.tax_code, t.tax_name, taxTypes[t.tax_type], `${t.tax_rate}%`, `${t.effective_from} \u301C ${t.effective_to || "\u671F\u9650\u306A\u3057"}`, t.active ? "\u6709\u52B9" : "\u7121\u52B9", /* @__PURE__ */ jsxs("div", { className: "row", children: [ jsx(Button, { variant: "ghost", onClick: () => setForm({ ...t, type: "tax_code", effective_to: t.effective_to || "", reason: "" }), children: "\u5909\u66F4" }), ...[-1, 1].map((direction) => jsx(Button, { variant: "outline", size: "sm", disabled: busy || index + direction < 0 || index + direction >= s.tax_codes.length, "aria-label": `${t.tax_name}を${direction < 0 ? "上" : "下"}へ移動`, onClick: () => moveTaxCode(index, direction), children: direction < 0 ? "↑" : "↓" }, direction)) ] })]) })
       ] }),
       /* @__PURE__ */ jsxs("section", { className: "panel", children: [
         /* @__PURE__ */ jsx("h2", { children: "\u8A08\u7B97\u8A2D\u5B9A" }),

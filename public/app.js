@@ -24002,6 +24002,10 @@ function amount(v) {
   assert(n >= 0n && n <= 999999999999n, "1明細の金額上限は999,999,999,999円です");
   return Number(n);
 }
+function orderedTaxCodes(s) {
+  const rank = (t) => Number.isSafeInteger(t.display_order) && t.display_order >= 0 ? t.display_order : Number.MAX_SAFE_INTEGER;
+  return [...s.tax_codes].sort((a, b) => rank(a) - rank(b) || a.tax_code.localeCompare(b.tax_code) || a.id.localeCompare(b.id));
+}
 function openingPlan(s, yearId, balances) {
   const y = s.years.find((year) => year.id === yearId);
   assert(y, "会計年度が見つかりません");
@@ -24810,7 +24814,7 @@ function TaxLineEditor({ s, editor, setEditor }) {
   } catch (e) {
     error = e.message;
   }
-  const sum2 = (key) => preview.reduce((n, l) => n + BigInt(l[key] || 0), 0n);
+  const sum = (key) => preview.reduce((n, l) => n + BigInt(l[key] || 0), 0n);
   return /* @__PURE__ */ (0, import_jsx_runtime24.jsxs)(import_jsx_runtime24.Fragment, { children: [
     /* @__PURE__ */ (0, import_jsx_runtime24.jsxs)("p", { className: "muted", children: [
       "\u6D88\u8CBB\u7A0E\uFF1A",
@@ -24841,7 +24845,7 @@ function TaxLineEditor({ s, editor, setEditor }) {
           /* @__PURE__ */ (0, import_jsx_runtime24.jsx)(TableCell, { children: /* @__PURE__ */ (0, import_jsx_runtime24.jsx)(Choose, { label: "\u501F\u8CB8", value: side, options: [["DEBIT", "\u501F\u65B9"], ["CREDIT", "\u8CB8\u65B9"]], onChange: (v) => update({ entry_side: v, debit_amount: v === "DEBIT" ? value : 0, credit_amount: v === "CREDIT" ? value : 0 }) }) }),
           /* @__PURE__ */ (0, import_jsx_runtime24.jsx)(TableCell, { children: /* @__PURE__ */ (0, import_jsx_runtime24.jsx)(Choose, { label: "\u5165\u529B\u65B9\u5F0F", value: l.amount_input_type || "NET", options: [["NET", "\u7A0E\u629C"], ["GROSS", "\u7A0E\u8FBC"]], onChange: (v) => update({ amount_input_type: v }) }) }),
           /* @__PURE__ */ (0, import_jsx_runtime24.jsxs)(TableCell, { children: [
-            /* @__PURE__ */ (0, import_jsx_runtime24.jsx)(Choose, { label: "\u7A0E\u533A\u5206", value: l.tax_code || "UNSPECIFIED", options: [["UNSPECIFIED", "\u7A0E\u60C5\u5831\u672A\u8A2D\u5B9A"], ...s.tax_codes.filter((t) => t.active || t.tax_code === l.tax_code).map((t) => [t.tax_code, t.tax_name + (t.active ? "" : "\uFF08\u7121\u52B9\uFF09")])], onChange: (v) => update({ tax_code: v, tax_override: "", tax_adjustment_reason: "" }) }),
+            /* @__PURE__ */ (0, import_jsx_runtime24.jsx)(Choose, { label: "\u7A0E\u533A\u5206", value: l.tax_code || "UNSPECIFIED", options: [["UNSPECIFIED", "\u7A0E\u60C5\u5831\u672A\u8A2D\u5B9A"], ...orderedTaxCodes(s).filter((t) => t.active || t.tax_code === l.tax_code).map((t) => [t.tax_code, t.tax_name + (t.active ? "" : "\uFF08\u7121\u52B9\uFF09")])], onChange: (v) => update({ tax_code: v, tax_override: "", tax_adjustment_reason: "" }) }),
             /* @__PURE__ */ (0, import_jsx_runtime24.jsx)("small", { children: calc?.tax_rate != null ? `${calc.tax_rate}%\uFF08\u4FDD\u5B58\u6642\u70B9\uFF09` : "\u7A0E\u7387\u672A\u8A2D\u5B9A" })
           ] }),
           /* @__PURE__ */ (0, import_jsx_runtime24.jsx)(TableCell, { children: /* @__PURE__ */ (0, import_jsx_runtime24.jsx)(Input, { "aria-label": `${i + 1}\u884C\u76EE\u306E\u5165\u529B\u91D1\u984D`, type: "number", min: "1", step: "1", value: value || "", onChange: (e) => update({ debit_amount: side === "DEBIT" ? e.target.value : 0, credit_amount: side === "CREDIT" ? e.target.value : 0 }) }) }),
@@ -24879,9 +24883,9 @@ function TaxLineEditor({ s, editor, setEditor }) {
       /* @__PURE__ */ (0, import_jsx_runtime24.jsx)(Button, { type: "button", variant: "outline", disabled: editor.lines.length >= 100, onClick: () => setEditor({ ...editor, lines: [...editor.lines, { account_id: "", subaccount_id: "", debit_amount: "", credit_amount: 0, entry_side: "DEBIT", amount_input_type: "NET", tax_code: "UNSPECIFIED", tax_override: "", tax_adjustment_reason: "" }] }), children: "\u660E\u7D30\u884C\u3092\u8FFD\u52A0" }),
       /* @__PURE__ */ (0, import_jsx_runtime24.jsxs)("strong", { children: [
         "\u78BA\u5B9A\u6642\u306E\u501F\u65B9 ",
-        money(sum2("debit_amount")),
+        money(sum("debit_amount")),
         " / \u8CB8\u65B9 ",
-        money(sum2("credit_amount")),
+        money(sum("credit_amount")),
         " \u5186"
       ] })
     ] }),
@@ -24889,9 +24893,9 @@ function TaxLineEditor({ s, editor, setEditor }) {
       "\u5165\u529B\u78BA\u8A8D\uFF1A",
       error
     ] }),
-    !error && sum2("debit_amount") !== sum2("credit_amount") && /* @__PURE__ */ (0, import_jsx_runtime24.jsxs)("p", { className: "alert", children: [
+    !error && sum("debit_amount") !== sum("credit_amount") && /* @__PURE__ */ (0, import_jsx_runtime24.jsxs)("p", { className: "alert", children: [
       "\u8CB8\u501F\u5DEE\u984D ",
-      money(sum2("debit_amount") - sum2("credit_amount")),
+      money(sum("debit_amount") - sum("credit_amount")),
       " \u5186\u3002\u73FE\u9810\u91D1\u30FB\u58F2\u639B\u91D1\u7B49\u306E\u76F8\u624B\u5074\u306B\u306F\u7A0E\u8FBC\u7DCF\u984D\u3092\u5165\u529B\u3057\u3066\u304F\u3060\u3055\u3044\u3002"
     ] }),
     preview.some((l) => l.is_tax_line) && /* @__PURE__ */ (0, import_jsx_runtime24.jsxs)("details", { children: [
@@ -24905,6 +24909,13 @@ function TaxDetails({ lines }) {
 }
 function TaxWorkspace({ s, start, end, page, act, onPrepare }) {
   const [form, setForm] = (0, import_react7.useState)(null), [busy, setBusy] = (0, import_react7.useState)(false), [error, setError] = (0, import_react7.useState)("");
+  function moveTaxCode(index, direction) {
+    const ids = orderedTaxCodes(s).map((t) => t.id);
+    const next = index + direction;
+    if (busy || next < 0 || next >= ids.length) return;
+    [ids[index], ids[next]] = [ids[next], ids[index]];
+    submit({ type: "tax_order", ids });
+  }
   async function submit(c) {
     setBusy(true);
     setError("");
@@ -24921,15 +24932,15 @@ function TaxWorkspace({ s, start, end, page, act, onPrepare }) {
     /* @__PURE__ */ (0, import_jsx_runtime24.jsx)("p", { children: "\u3053\u306E\u4F1A\u793E\u306B7\u3064\u306E\u7A0E\u533A\u5206\u3068\u4EEE\u6255\u6D88\u8CBB\u7A0E\u30FB\u4EEE\u53D7\u6D88\u8CBB\u7A0E\u30FB\u672A\u6255\u6D88\u8CBB\u7A0E\u7B49\u3092\u8FFD\u52A0\u3057\u307E\u3059\u3002\u904E\u53BB\u4ED5\u8A33\u306F\u7A0E\u60C5\u5831\u672A\u8A2D\u5B9A\u306E\u307E\u307E\u4FDD\u6301\u3057\u307E\u3059\u3002" }),
     /* @__PURE__ */ (0, import_jsx_runtime24.jsx)(Button, { disabled: busy, onClick: () => submit({ type: "tax_setup" }), children: "\u3053\u306E\u4F1A\u793E\u3067\u7A0E\u629C\u7D4C\u7406\u3092\u6709\u52B9\u306B\u3059\u308B" })
   ] });
-  let r2 = null;
+  let r = null;
   try {
-    r2 = taxReport(s, start, end);
+    r = taxReport(s, start, end);
   } catch {
   }
   function candidate(payment) {
-    if (!r2) return;
+    if (!r) return;
     const a = s.company.tax_accounts;
-    const n = BigInt(payment ? r2.balances.payable.closing : r2.net_balance), out = BigInt(r2.balances.output.closing), input = BigInt(r2.balances.input.closing);
+    const n = BigInt(payment ? r.balances.payable.closing : r.net_balance), out = BigInt(r.balances.output.closing), input = BigInt(r.balances.input.closing);
     if (n <= 0n || !payment && (out < 0n || input < 0n)) {
       setError("\u6B63\u306E\u7D0D\u4ED8\u898B\u8FBC\u307F\u984D\u304C\u3042\u308A\u307E\u305B\u3093\u3002\u9084\u4ED8\u30FB\u30DE\u30A4\u30CA\u30B9\u6B8B\u9AD8\u306F\u901A\u5E38\u4ED5\u8A33\u3067\u6574\u7406\u3057\u3066\u304F\u3060\u3055\u3044\u3002");
       return;
@@ -24940,31 +24951,31 @@ function TaxWorkspace({ s, start, end, page, act, onPrepare }) {
   }
   return /* @__PURE__ */ (0, import_jsx_runtime24.jsxs)(import_jsx_runtime24.Fragment, { children: [
     error && /* @__PURE__ */ (0, import_jsx_runtime24.jsx)("p", { className: "alert", children: error }),
-    page === "\u6D88\u8CBB\u7A0E\u96C6\u8A08\u8868" && r2 ? /* @__PURE__ */ (0, import_jsx_runtime24.jsxs)(import_jsx_runtime24.Fragment, { children: [
+    page === "\u6D88\u8CBB\u7A0E\u96C6\u8A08\u8868" && r ? /* @__PURE__ */ (0, import_jsx_runtime24.jsxs)(import_jsx_runtime24.Fragment, { children: [
       /* @__PURE__ */ (0, import_jsx_runtime24.jsxs)("section", { className: "panel", children: [
         /* @__PURE__ */ (0, import_jsx_runtime24.jsx)("h2", { children: "\u6D88\u8CBB\u7A0E\u96C6\u8A08\u8868" }),
         /* @__PURE__ */ (0, import_jsx_runtime24.jsx)("p", { className: "muted", children: "\u78BA\u5B9A\u6642\u306E\u7A0E\u60C5\u5831\u3092\u96C6\u8A08\u3002\u81EA\u52D5\u7A0E\u660E\u7D30\u3068\u524A\u9664\u6E08\u307F\u4ED5\u8A33\u306F\u9664\u5916\u3002\u8FD4\u54C1\u30FB\u53D6\u6D88\u65B9\u5411\u306F\u30DE\u30A4\u30CA\u30B9\u3067\u96C6\u8A08\u3057\u307E\u3059\u3002" }),
-        r2.unknown > 0 && /* @__PURE__ */ (0, import_jsx_runtime24.jsxs)("p", { className: "alert", children: [
+        r.unknown > 0 && /* @__PURE__ */ (0, import_jsx_runtime24.jsxs)("p", { className: "alert", children: [
           "\u7A0E\u60C5\u5831\u672A\u8A2D\u5B9A\uFF1A",
-          r2.unknown,
+          r.unknown,
           "\u660E\u7D30\u3002\u904E\u53BB\u4ED5\u8A33\u306E\u7A0E\u60C5\u5831\u306F\u63A8\u6E2C\u3057\u3066\u3044\u307E\u305B\u3093\u3002\u3053\u306E\u96C6\u8A08\u3060\u3051\u3067\u306F\u7533\u544A\u7A0E\u984D\u3092\u78BA\u5B9A\u3067\u304D\u307E\u305B\u3093\u3002"
         ] }),
-        /* @__PURE__ */ (0, import_jsx_runtime24.jsx)(DataTable, { heads: ["\u7A0E\u533A\u5206", "\u7A0E\u7387", "\u7A0E\u629C\u53D6\u5F15\u91D1\u984D", "\u6D88\u8CBB\u7A0E\u984D", "\u7A0E\u8FBC\u91D1\u984D", "\u660E\u7D30\u4EF6\u6570", "\u4ED5\u8A33\u4EF6\u6570"], rows: r2.rows.map((g) => [g.tax_name, `${g.tax_rate}%`, money(g.taxable_amount), money(g.tax_amount), money(g.gross_amount), g.count, g.journal_count]) })
+        /* @__PURE__ */ (0, import_jsx_runtime24.jsx)(DataTable, { heads: ["\u7A0E\u533A\u5206", "\u7A0E\u7387", "\u7A0E\u629C\u53D6\u5F15\u91D1\u984D", "\u6D88\u8CBB\u7A0E\u984D", "\u7A0E\u8FBC\u91D1\u984D", "\u660E\u7D30\u4EF6\u6570", "\u4ED5\u8A33\u4EF6\u6570"], rows: r.rows.map((g) => [g.tax_name, `${g.tax_rate}%`, money(g.taxable_amount), money(g.tax_amount), money(g.gross_amount), g.count, g.journal_count]) })
       ] }),
       /* @__PURE__ */ (0, import_jsx_runtime24.jsxs)("section", { className: "panel", children: [
         /* @__PURE__ */ (0, import_jsx_runtime24.jsx)("h2", { children: "\u6D88\u8CBB\u7A0E\u52D8\u5B9A\u3068\u306E\u7167\u5408" }),
         /* @__PURE__ */ (0, import_jsx_runtime24.jsx)(DataTable, { heads: ["\u52D8\u5B9A", "\u671F\u9996\u6B8B\u9AD8", "\u7A0E\u60C5\u5831\u306E\u671F\u9593\u7A0E\u984D", "\u5143\u5E33\u306E\u671F\u9593\u5897\u6E1B", "\u3046\u3061\u624B\u52D5\u4ED5\u8A33", "\u671F\u672B\u6B8B\u9AD8", "\u5DEE\u984D\uFF08\u5897\u6E1B\u2212\u7A0E\u60C5\u5831\uFF09"], rows: ["input", "output", "payable"].map((k, i) => {
-          const b = r2.balances[k];
+          const b = r.balances[k];
           return [["\u4EEE\u6255\u6D88\u8CBB\u7A0E", "\u4EEE\u53D7\u6D88\u8CBB\u7A0E", "\u672A\u6255\u6D88\u8CBB\u7A0E\u7B49"][i], money(b.opening), k === "payable" ? "\u2014" : money(b.snapshot), money(b.movement), money(b.manual), money(b.closing), k === "payable" ? "\u2014" : money(b.difference)];
         }) }),
         /* @__PURE__ */ (0, import_jsx_runtime24.jsxs)("p", { children: [
           "\u4EEE\u53D7\u2212\u4EEE\u6255\u306E\u671F\u672B\u6B8B\u9AD8\u5DEE\uFF1A",
           /* @__PURE__ */ (0, import_jsx_runtime24.jsxs)("strong", { children: [
-            money(r2.net_balance),
+            money(r.net_balance),
             " \u5186"
           ] })
         ] }),
-        ["input", "output"].some((k) => r2.balances[k].difference !== "0") && /* @__PURE__ */ (0, import_jsx_runtime24.jsx)("p", { className: "alert", children: "\u7A0E\u60C5\u5831\u96C6\u8A08\u3068\u5143\u5E33\u5897\u6E1B\u306B\u5DEE\u984D\u304C\u3042\u308A\u307E\u3059\u3002\u6C7A\u7B97\u6574\u7406\u30FB\u624B\u52D5\u8ABF\u6574\u30FB\u958B\u59CB\u6B8B\u9AD8\u3092\u78BA\u8A8D\u3057\u3066\u304F\u3060\u3055\u3044\u3002\u81EA\u52D5\u4FEE\u6B63\u306F\u884C\u3044\u307E\u305B\u3093\u3002" }),
+        ["input", "output"].some((k) => r.balances[k].difference !== "0") && /* @__PURE__ */ (0, import_jsx_runtime24.jsx)("p", { className: "alert", children: "\u7A0E\u60C5\u5831\u96C6\u8A08\u3068\u5143\u5E33\u5897\u6E1B\u306B\u5DEE\u984D\u304C\u3042\u308A\u307E\u3059\u3002\u6C7A\u7B97\u6574\u7406\u30FB\u624B\u52D5\u8ABF\u6574\u30FB\u958B\u59CB\u6B8B\u9AD8\u3092\u78BA\u8A8D\u3057\u3066\u304F\u3060\u3055\u3044\u3002\u81EA\u52D5\u4FEE\u6B63\u306F\u884C\u3044\u307E\u305B\u3093\u3002" }),
         /* @__PURE__ */ (0, import_jsx_runtime24.jsx)("p", { className: "muted", children: "\u671F\u672B\u6B8B\u9AD8\u306F\u671F\u9996\u6B8B\u9AD8\u3092\u542B\u307F\u307E\u3059\u3002\u6D88\u8CBB\u7A0E\u7533\u544A\u306E\u7D0D\u4ED8\u984D\u3067\u306F\u3042\u308A\u307E\u305B\u3093\u3002" }),
         /* @__PURE__ */ (0, import_jsx_runtime24.jsxs)("div", { className: "row", children: [
           /* @__PURE__ */ (0, import_jsx_runtime24.jsx)(Button, { onClick: () => candidate(false), children: "\u6C7A\u7B97\u6574\u7406\u4ED5\u8A33\u306E\u5019\u88DC\u3092\u958B\u304F" }),
@@ -24979,7 +24990,7 @@ function TaxWorkspace({ s, start, end, page, act, onPrepare }) {
           /* @__PURE__ */ (0, import_jsx_runtime24.jsx)(Button, { onClick: () => setForm({ type: "tax_code", tax_code: "", tax_name: "", tax_type: "SALES", tax_rate: "10", effective_from: "2026-01-01", effective_to: "", active: true, reason: "" }), children: "\u65B0\u3057\u3044\u7A0E\u533A\u5206" })
         ] }),
         /* @__PURE__ */ (0, import_jsx_runtime24.jsx)("p", { className: "muted", children: "\u7A0E\u7387\u30FB\u7A2E\u5225\u30FB\u30B3\u30FC\u30C9\u306F\u4F5C\u6210\u5F8C\u306B\u4E0A\u66F8\u304D\u3067\u304D\u307E\u305B\u3093\u3002\u7A0E\u7387\u5909\u66F4\u306F\u65B0\u3057\u3044\u533A\u5206\u3092\u8FFD\u52A0\u3057\u3066\u304F\u3060\u3055\u3044\u3002" }),
-        /* @__PURE__ */ (0, import_jsx_runtime24.jsx)(DataTable, { heads: ["\u30B3\u30FC\u30C9", "\u540D\u79F0", "\u7A2E\u5225", "\u7A0E\u7387", "\u9069\u7528\u671F\u9593", "\u72B6\u614B", "\u64CD\u4F5C"], rows: s.tax_codes.map((t) => [t.tax_code, t.tax_name, taxTypes[t.tax_type], `${t.tax_rate}%`, `${t.effective_from} \u301C ${t.effective_to || "\u671F\u9650\u306A\u3057"}`, t.active ? "\u6709\u52B9" : "\u7121\u52B9", /* @__PURE__ */ (0, import_jsx_runtime24.jsx)(Button, { variant: "ghost", onClick: () => setForm({ ...t, type: "tax_code", effective_to: t.effective_to || "", reason: "" }), children: "\u5909\u66F4" })]) })
+        /* @__PURE__ */ (0, import_jsx_runtime24.jsx)(DataTable, { heads: ["\u30B3\u30FC\u30C9", "\u540D\u79F0", "\u7A2E\u5225", "\u7A0E\u7387", "\u9069\u7528\u671F\u9593", "\u72B6\u614B", "\u64CD\u4F5C"], rows: orderedTaxCodes(s).map((t, index) => [t.tax_code, t.tax_name, taxTypes[t.tax_type], `${t.tax_rate}%`, `${t.effective_from} \u301C ${t.effective_to || "\u671F\u9650\u306A\u3057"}`, t.active ? "\u6709\u52B9" : "\u7121\u52B9", /* @__PURE__ */ (0, import_jsx_runtime24.jsxs)("div", { className: "row", children: [ (0, import_jsx_runtime24.jsx)(Button, { variant: "ghost", onClick: () => setForm({ ...t, type: "tax_code", effective_to: t.effective_to || "", reason: "" }), children: "\u5909\u66F4" }), ...[-1, 1].map((direction) => (0, import_jsx_runtime24.jsx)(Button, { variant: "outline", size: "sm", disabled: busy || index + direction < 0 || index + direction >= s.tax_codes.length, "aria-label": `${t.tax_name}を${direction < 0 ? "上" : "下"}へ移動`, onClick: () => moveTaxCode(index, direction), children: direction < 0 ? "↑" : "↓" }, direction)) ] })]) })
       ] }),
       /* @__PURE__ */ (0, import_jsx_runtime24.jsxs)("section", { className: "panel", children: [
         /* @__PURE__ */ (0, import_jsx_runtime24.jsx)("h2", { children: "\u8A08\u7B97\u8A2D\u5B9A" }),
@@ -24992,10 +25003,10 @@ function TaxWorkspace({ s, start, end, page, act, onPrepare }) {
         /* @__PURE__ */ (0, import_jsx_runtime24.jsx)("p", { className: "muted", children: "\u8A2D\u5B9A\u5909\u66F4\u306F\u904E\u53BB\u4ED5\u8A33\u3092\u518D\u8A08\u7B97\u3057\u307E\u305B\u3093\u3002\u8ACB\u6C42\u66F8\u5358\u4F4D\u30FB\u7A0E\u7387\u3054\u3068\u306E\u7AEF\u6570\u3068\u306E\u5DEE\u306F\u5165\u529B\u6642\u306B\u7A0E\u984D\u8ABF\u6574\u3057\u3066\u304F\u3060\u3055\u3044\u3002" })
       ] })
     ] }) : null,
-    /* @__PURE__ */ (0, import_jsx_runtime24.jsx)(Dialog2, { open: !!form, onOpenChange: (v) => !v && setForm(null), children: /* @__PURE__ */ (0, import_jsx_runtime24.jsxs)(DialogContent3, { children: [
+    /* @__PURE__ */ (0, import_jsx_runtime24.jsx)(Dialog, { open: !!form, onOpenChange: (v) => !v && setForm(null), children: /* @__PURE__ */ (0, import_jsx_runtime24.jsxs)(DialogContent, { children: [
       /* @__PURE__ */ (0, import_jsx_runtime24.jsxs)(DialogHeader, { children: [
-        /* @__PURE__ */ (0, import_jsx_runtime24.jsx)(DialogTitle3, { children: form?.type === "tax_settings" ? "\u7AEF\u6570\u51E6\u7406\u8A2D\u5B9A" : "\u7A0E\u533A\u5206\u306E\u767B\u9332\u30FB\u5909\u66F4" }),
-        /* @__PURE__ */ (0, import_jsx_runtime24.jsx)(DialogDescription3, { children: "\u5909\u66F4\u306F\u76E3\u67FB\u5C65\u6B74\u306B\u8A18\u9332\u3057\u307E\u3059\u3002" })
+        /* @__PURE__ */ (0, import_jsx_runtime24.jsx)(DialogTitle, { children: form?.type === "tax_settings" ? "\u7AEF\u6570\u51E6\u7406\u8A2D\u5B9A" : "\u7A0E\u533A\u5206\u306E\u767B\u9332\u30FB\u5909\u66F4" }),
+        /* @__PURE__ */ (0, import_jsx_runtime24.jsx)(DialogDescription, { children: "\u5909\u66F4\u306F\u76E3\u67FB\u5C65\u6B74\u306B\u8A18\u9332\u3057\u307E\u3059\u3002" })
       ] }),
       form && /* @__PURE__ */ (0, import_jsx_runtime24.jsx)("form", { onSubmit: (e) => {
         e.preventDefault();
@@ -25032,7 +25043,7 @@ function TaxWorkspace({ s, start, end, page, act, onPrepare }) {
               /* @__PURE__ */ (0, import_jsx_runtime24.jsx)(Input, { type: "date", value: form.effective_to, onChange: (e) => setForm({ ...form, effective_to: e.target.value }) })
             ] }),
             /* @__PURE__ */ (0, import_jsx_runtime24.jsxs)("label", { className: "row", children: [
-              /* @__PURE__ */ (0, import_jsx_runtime24.jsx)(Checkbox3, { checked: form.active, onCheckedChange: (v) => setForm({ ...form, active: v === true }) }),
+              /* @__PURE__ */ (0, import_jsx_runtime24.jsx)(Checkbox, { checked: form.active, onCheckedChange: (v) => setForm({ ...form, active: v === true }) }),
               "\u6709\u52B9"
             ] })
           ] }),
@@ -26219,7 +26230,7 @@ function AccountingApp() {
           modal.type === "account" && /* @__PURE__ */ (0, import_jsx_runtime31.jsxs)(import_jsx_runtime31.Fragment, { children: [
             /* @__PURE__ */ (0, import_jsx_runtime31.jsx)(Field, { label: "\u52D8\u5B9A\u79D1\u76EE\u30B3\u30FC\u30C9", children: /* @__PURE__ */ (0, import_jsx_runtime31.jsx)(Input, { required: true, value: modal.account_code, onChange: (e) => setModal({ ...modal, account_code: e.target.value }) }) }),
             /* @__PURE__ */ (0, import_jsx_runtime31.jsx)(Field, { label: "\u52D8\u5B9A\u79D1\u76EE\u540D", children: /* @__PURE__ */ (0, import_jsx_runtime31.jsx)(Input, { required: true, value: modal.account_name, onChange: (e) => setModal({ ...modal, account_name: e.target.value }) }) }),
-            /* @__PURE__ */ (0, import_jsx_runtime31.jsx)(Field, { label: "\u30C7\u30D5\u30A9\u30EB\u30C8\u7A0E\u533A\u5206", children: /* @__PURE__ */ (0, import_jsx_runtime31.jsx)(Choice, { value: modal.default_tax_code || "UNSPECIFIED", onChange: (v) => setModal({ ...modal, default_tax_code: v }), options: [["UNSPECIFIED", "\u7A0E\u60C5\u5831\u672A\u8A2D\u5B9A"], ...s.tax_codes.map((t) => [t.tax_code, t.tax_name + (t.active ? "" : "\uFF08\u7121\u52B9\uFF09")])] }) }),
+            /* @__PURE__ */ (0, import_jsx_runtime31.jsx)(Field, { label: "\u30C7\u30D5\u30A9\u30EB\u30C8\u7A0E\u533A\u5206", children: /* @__PURE__ */ (0, import_jsx_runtime31.jsx)(Choice, { value: modal.default_tax_code || "UNSPECIFIED", onChange: (v) => setModal({ ...modal, default_tax_code: v }), options: [["UNSPECIFIED", "\u7A0E\u60C5\u5831\u672A\u8A2D\u5B9A"], ...orderedTaxCodes(s).map((t) => [t.tax_code, t.tax_name + (t.active ? "" : "\uFF08\u7121\u52B9\uFF09")])] }) }),
             /* @__PURE__ */ (0, import_jsx_runtime31.jsx)(Field, { label: "\u8CA1\u52D9\u8AF8\u8868\u533A\u5206", children: /* @__PURE__ */ (0, import_jsx_runtime31.jsx)(Choice, { value: modal.section, onChange: (v) => setModal({ ...modal, section: v, normal_balance: ["ASSET", "EXPENSE"].includes(sectionTypes[v]) ? "DEBIT" : "CREDIT" }), options: Object.entries(sections) }) }),
             /* @__PURE__ */ (0, import_jsx_runtime31.jsx)(Field, { label: "\u901A\u5E38\u6B8B\u9AD8", children: /* @__PURE__ */ (0, import_jsx_runtime31.jsx)(Choice, { value: modal.normal_balance || (["ASSET", "EXPENSE"].includes(sectionTypes[modal.section]) ? "DEBIT" : "CREDIT"), onChange: (v) => setModal({ ...modal, normal_balance: v }), options: [["DEBIT", "\u501F\u65B9"], ["CREDIT", "\u8CB8\u65B9"]] }) }),
             /* @__PURE__ */ (0, import_jsx_runtime31.jsx)(Field, { label: "\u30C0\u30C3\u30B7\u30E5\u30DC\u30FC\u30C9\u96C6\u8A08\u533A\u5206", children: /* @__PURE__ */ (0, import_jsx_runtime31.jsx)(Choice, { value: modal.tag, onChange: (v) => setModal({ ...modal, tag: v }), options: [["", "\u6307\u5B9A\u306A\u3057"], ["CASH", "\u73FE\u9810\u91D1"], ["AR", "\u58F2\u639B\u91D1"], ["AP", "\u8CB7\u639B\u91D1\u30FB\u672A\u6255\u91D1"], ["RETAINED", "\u7E70\u8D8A\u5229\u76CA\u5270\u4F59\u91D1"]] }) })

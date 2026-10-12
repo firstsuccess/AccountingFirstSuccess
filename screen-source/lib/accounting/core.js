@@ -95,6 +95,10 @@ function createCompany(user, name, start, end, test = false) {
   log(s, user, "ACCOUNT_INITIALIZE", "accounts", s.company.id, null, s.accounts);
   return s;
 }
+function orderedTaxCodes(s) {
+  const rank = (t) => Number.isSafeInteger(t.display_order) && t.display_order >= 0 ? t.display_order : Number.MAX_SAFE_INTEGER;
+  return [...s.tax_codes].sort((a, b) => rank(a) - rank(b) || a.tax_code.localeCompare(b.tax_code) || a.id.localeCompare(b.id));
+}
 function openingPlan(s, yearId, balances) {
   const y = s.years.find((year) => year.id === yearId);
   assert(y, "会計年度が見つかりません");
@@ -286,6 +290,11 @@ function mutate(input, command, user) {
     const before = structuredClone(s.company);
     s.company.tax_rounding = c.tax_rounding;
     log(s, user, "TAX_SETTINGS_CHANGE", "company", s.company.id, before, s.company, str(c.reason));
+  } else if (c.type === "tax_order") {
+    assert(Array.isArray(c.ids) && c.ids.length === s.tax_codes.length && new Set(c.ids).size === s.tax_codes.length && c.ids.every((id) => s.tax_codes.some((t) => t.id === id)), "税区分の並び順が不正です。再読み込みしてください");
+    const before = orderedTaxCodes(s).map((t) => ({ id: t.id, display_order: t.display_order ?? null }));
+    c.ids.forEach((id, index) => { s.tax_codes.find((t) => t.id === id).display_order = index; });
+    log(s, user, "TAX_CODE_REORDER", "tax_codes", s.company.id, before, orderedTaxCodes(s).map((t) => ({ id: t.id, display_order: t.display_order })), "税区分の表示順変更");
   } else if (c.type === "tax_code") {
     const old = s.tax_codes.find((t2) => t2.id === c.id);
     assert(!c.id || old, "\u7A0E\u533A\u5206\u304C\u898B\u3064\u304B\u308A\u307E\u305B\u3093");
@@ -297,6 +306,7 @@ function mutate(input, command, user) {
     assert(!s.tax_codes.some((t2) => t2.id !== c.id && t2.tax_code === code), "\u7A0E\u533A\u5206\u30B3\u30FC\u30C9\u304C\u91CD\u8907\u3057\u3066\u3044\u307E\u3059");
     if (old) assert(old.tax_code === code && old.tax_type === c.tax_type && rateBps(old.tax_rate) === rateBps(c.tax_rate), "\u7A0E\u7387\u30FB\u7A2E\u5225\u30FB\u30B3\u30FC\u30C9\u306F\u4E0A\u66F8\u304D\u305B\u305A\u65B0\u3057\u3044\u7A0E\u533A\u5206\u3092\u8FFD\u52A0\u3057\u3066\u304F\u3060\u3055\u3044");
     const t = { id: old?.id || uid(), tax_code: code, tax_name: str(c.tax_name, 100), tax_type: c.tax_type, tax_rate: String(c.tax_rate), effective_from: date(c.effective_from), effective_to: c.effective_to ? date(c.effective_to) : null, active: c.active !== false };
+    if (old?.display_order !== undefined) t.display_order = old.display_order;
     assert(!t.effective_to || t.effective_to >= t.effective_from, "\u9069\u7528\u671F\u9593\u304C\u4E0D\u6B63\u3067\u3059");
     if (old) s.tax_codes[s.tax_codes.indexOf(old)] = t;
     else s.tax_codes.push(t);
@@ -380,7 +390,7 @@ function seedTest(user) {
   return s;
 }
 const csvColumns = { company: ["id", "owner", "name", "currency", "start", "end", "version", "test", "corporate_number", "next_number", "created_at"], journals: ["id", "journal_number", "transaction_date", "year_id", "description", "counterparty", "status", "revision", "created_at", "created_by", "updated_at", "updated_by", "deleted_at", "deleted_by", "delete_reason", "source_type", "source_id"], lines: ["id", "journal_id", "revision", "account_id", "subaccount_id", "debit_amount", "credit_amount", "tax_code", "line_description"], accounts: ["id", "account_code", "account_name", "account_type", "statement_type", "normal_balance", "section", "tag", "default_tax_code", "display_order", "active"], subaccounts: ["id", "account_id", "name", "active"], years: ["id", "start", "end", "status", "changed_at", "changed_by"], periods: ["id", "year_id", "start", "end", "status", "changed_at", "changed_by"], audit: ["id", "event_type", "target_type", "target_id", "user", "timestamp", "before", "after", "reason"] };
-csvColumns.tax_codes = ["id", "tax_code", "tax_name", "tax_type", "tax_rate", "effective_from", "effective_to", "active"];
+csvColumns.tax_codes = ["id", "tax_code", "tax_name", "tax_type", "tax_rate", "effective_from", "effective_to", "active", "display_order"];
 csvColumns.lines.push(...taxFields.filter((k) => !csvColumns.lines.includes(k)), "is_tax_line", "tax_source_line_id", "entry_side");
 csvColumns.company.push("tax_rounding", "tax_accounts", "accounting_method");
 csvColumns.journals.push("journal_kind");
@@ -397,6 +407,7 @@ export {
   postingLines,
   reports,
   openingPlan,
+  orderedTaxCodes,
   sectionTypes,
   sections,
   seedTest,
