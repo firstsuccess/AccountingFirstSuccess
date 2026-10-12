@@ -134,6 +134,17 @@ function mutate(input, command, user) {
   assert(input.company.owner === user, "\u3053\u306E\u4F1A\u793E\u3078\u306E\u6A29\u9650\u304C\u3042\u308A\u307E\u305B\u3093");
   const s = structuredClone(input);
   let c = command;
+  assert(!s.company.archived || c.type === "company_archive", "アーカイブ済み会社は復元してから更新してください");
+  if (c.type === "company_archive") {
+    assert(typeof c.archived === "boolean" && c.archived !== (s.company.archived === true), "会社のアーカイブ状態に変更がありません");
+    const before = structuredClone(s.company), reason = str(c.reason);
+    s.company.archived = c.archived;
+    s.company.archive_changed_at = new Date().toISOString();
+    s.company.archive_changed_by = user;
+    log(s, user, c.archived ? "COMPANY_ARCHIVE" : "COMPANY_RESTORE", "company", s.company.id, before, s.company, reason);
+    s.company.version++;
+    return s;
+  }
   s.tax_codes ||= [];
   const now = (/* @__PURE__ */ new Date()).toISOString();
   const isOpening = c.type === "opening";
@@ -392,7 +403,7 @@ function seedTest(user) {
 const csvColumns = { company: ["id", "owner", "name", "currency", "start", "end", "version", "test", "corporate_number", "next_number", "created_at"], journals: ["id", "journal_number", "transaction_date", "year_id", "description", "counterparty", "status", "revision", "created_at", "created_by", "updated_at", "updated_by", "deleted_at", "deleted_by", "delete_reason", "source_type", "source_id"], lines: ["id", "journal_id", "revision", "account_id", "subaccount_id", "debit_amount", "credit_amount", "tax_code", "line_description"], accounts: ["id", "account_code", "account_name", "account_type", "statement_type", "normal_balance", "section", "tag", "default_tax_code", "display_order", "active"], subaccounts: ["id", "account_id", "name", "active"], years: ["id", "start", "end", "status", "changed_at", "changed_by"], periods: ["id", "year_id", "start", "end", "status", "changed_at", "changed_by"], audit: ["id", "event_type", "target_type", "target_id", "user", "timestamp", "before", "after", "reason"] };
 csvColumns.tax_codes = ["id", "tax_code", "tax_name", "tax_type", "tax_rate", "effective_from", "effective_to", "active", "display_order"];
 csvColumns.lines.push(...taxFields.filter((k) => !csvColumns.lines.includes(k)), "is_tax_line", "tax_source_line_id", "entry_side");
-csvColumns.company.push("tax_rounding", "tax_accounts", "accounting_method");
+csvColumns.company.push("tax_rounding", "tax_accounts", "accounting_method", "archived", "archive_changed_at", "archive_changed_by");
 csvColumns.journals.push("journal_kind");
 export {
   assert,

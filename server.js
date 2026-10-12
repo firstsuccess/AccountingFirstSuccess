@@ -65,7 +65,7 @@ const server=http.createServer(async(req,res)=>{
  const db=await pool();
  if(req.method==='GET'){
  const id=url.searchParams.get('company');
- if(!id){const r=await query(db,'SELECT data,version FROM dbo.companies WHERE owner=@p0 ORDER BY id',[u.owner]);return json(res,{companies:r.recordset.map(r=>({...JSON.parse(r.data),version:r.version})),user:u.displayName||u.username});}
+ if(!id){const r=await query(db,'SELECT data,version FROM dbo.companies WHERE owner=@p0 ORDER BY id',[u.owner]);const companies=r.recordset.map(r=>({...JSON.parse(r.data),version:r.version}));return json(res,{companies:companies.filter(c=>!c.archived),archived_companies:companies.filter(c=>c.archived),user:u.displayName||u.username});}
  const s=await load(db,id,u.owner);
  if(!url.searchParams.has('export'))return json(res,s);
  const type=url.searchParams.get('export');let content,mime;
@@ -82,6 +82,7 @@ const server=http.createServer(async(req,res)=>{
  if(c.type==='test')throw new Error('新しいテスト会社は作成できません');
  if(c.type==='create'){const s=createCompany(u.owner,c.name,c.start,c.end);await save(db,null,s,u.owner);return json(res,s,201);}
  const before=await load(db,c.company_id,u.owner);if(before.company.version!==c.version)return json(res,{error:'別の操作で更新されています。再読み込みしてください'},409);
+ if(before.company.archived&&c.type!=='company_archive')throw new Error('アーカイブ済み会社は復元してから更新してください');
  if(['csv_preview','csv_execute'].includes(c.type)){const result=prepareImport(before,c.csv,u.owner,c.reason,c.filename);if(c.type==='csv_preview')return json(res,{summary:result.summary,version:before.company.version});await save(db,before,result.after,u.owner);return json(res,result.after);}
  const after=mutate(before,c,u.owner);await save(db,before,after,u.owner);return json(res,after);
  }

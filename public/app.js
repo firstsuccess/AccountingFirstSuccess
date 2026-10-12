@@ -25787,28 +25787,30 @@ function OpeningBalances({ s, year, act, busy }) {
 function AccountingApp() {
   const [companies, setCompanies] = (0, import_react8.useState)([]), [s, setS] = (0, import_react8.useState)(null), [page, setPage] = (0, import_react8.useState)("\u30C0\u30C3\u30B7\u30E5\u30DC\u30FC\u30C9"), [busy, setBusy] = (0, import_react8.useState)(false), [error, setError] = (0, import_react8.useState)(""), [notice, setNotice] = (0, import_react8.useState)(""), [start, setStart] = (0, import_react8.useState)(""), [end, setEnd] = (0, import_react8.useState)(""), [yearId, setYearId] = (0, import_react8.useState)(""), [editor, setEditor] = (0, import_react8.useState)(null), [modal, setModal] = (0, import_react8.useState)(null), [confirm, setConfirm] = (0, import_react8.useState)(null), [reason, setReason] = (0, import_react8.useState)(""), [detail, setDetail] = (0, import_react8.useState)(null), [user, setUser] = (0, import_react8.useState)("");
   const [filters, setFilters] = (0, import_react8.useState)({ number: "", account: "", sub: "", description: "", counterparty: "", min: "", max: "", deleted: false }), [ledgerId, setLedgerId] = (0, import_react8.useState)("");
+  const [archivedCompanies, setArchivedCompanies] = (0, import_react8.useState)([]);
   const blank = () => ({ type: "journal", transaction_date: start, description: "", counterparty: "", lines: [{ account_id: "", subaccount_id: "", debit_amount: "", credit_amount: "", line_description: "" }, { account_id: "", subaccount_id: "", debit_amount: "", credit_amount: "", line_description: "" }], reason: "" });
   async function listCompanies() {
-    const r2 = await fetch("/api/accounting");
-    const d = await r2.json();
-    if (!r2.ok) throw new Error(d.error);
+    const r = await fetch("/api/accounting");
+    const d = await r.json();
+    if (!r.ok) throw new Error(d.error);
     setCompanies(d.companies);
+    setArchivedCompanies(d.archived_companies || []);
     setUser(d.user);
     return d.companies;
   }
   function selectYear(state, id) {
-    const y = state.years.find((y2) => y2.id === id) || state.years[0];
+    const y = state.years.find((y2) => y2.id === id) || [...state.years].sort((a, b) => a.start.localeCompare(b.start))[0];
     setYearId(y.id);
     setStart(y.start);
-    setEnd(state.periods.find((p) => p.year_id === y.id)?.end || y.end);
+    setEnd(state.periods.filter((p) => p.year_id === y.id).sort((a, b) => a.start.localeCompare(b.start))[0]?.end || y.end);
   }
   async function loadCompany(id, reset = true) {
     setBusy(true);
     setError("");
     try {
-      const r2 = await fetch(`/api/accounting?company=${id}`);
-      const d = await r2.json();
-      if (!r2.ok) throw new Error(d.error);
+      const r = await fetch(`/api/accounting?company=${id}`);
+      const d = await r.json();
+      if (!r.ok) throw new Error(d.error);
       setS(d);
       if (reset) {
         selectYear(d);
@@ -25833,15 +25835,23 @@ function AccountingApp() {
     setError("");
     setNotice("");
     try {
-      const r2 = await fetch("/api/accounting", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ...command, company_id: s?.company.id, version: s?.company.version }) });
-      const d = await r2.json();
-      if (!r2.ok) throw new Error(d.error);
+      const r = await fetch("/api/accounting", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ...command, company_id: command.company_id || s?.company.id, version: command.version ?? s?.company.version }) });
+      const d = await r.json();
+      if (!r.ok) throw new Error(d.error);
       setS(d);
       if (command.type === "create" || command.type === "test") {
         selectYear(d);
         setLedgerId(d.accounts[0]?.id || "");
       }
-      await listCompanies();
+      const available = await listCompanies();
+      if (command.type === "company_archive") {
+        setEditor(null); setDetail(null);
+        if (d.company.archived) {
+          setS(null);
+          if (available[0]) await loadCompany(available[0].id);
+        } else { selectYear(d); setLedgerId(d.accounts[0]?.id || ""); }
+        setPage("\u8A2D\u5B9A");
+      }
       setNotice("\u4FDD\u5B58\u3057\u307E\u3057\u305F");
       setModal(null);
       setConfirm(null);
@@ -25959,6 +25969,13 @@ function AccountingApp() {
         ] }),
         error && /* @__PURE__ */ (0, import_jsx_runtime31.jsx)("div", { className: "alert", role: "alert", children: error }),
         notice && /* @__PURE__ */ (0, import_jsx_runtime31.jsx)("div", { className: "success", role: "status", children: notice }),
+        (page === "\u8A2D\u5B9A" || !s) && (0, import_jsx_runtime31.jsxs)("section", { className: "panel", children: [
+          (0, import_jsx_runtime31.jsx)("h2", { children: "会社のアーカイブ・復元" }),
+          (0, import_jsx_runtime31.jsx)("p", { children: "アーカイブすると通常の会社選択から非表示になります。仕訳・残高・設定・履歴は保存され、復元後も引き継がれます。年度のCLOSED・LOCKED状態も維持されます。" }),
+          s && !s.company.archived && (0, import_jsx_runtime31.jsx)(Button, { variant: "outline", disabled: busy, onClick: () => ask({ type: "company_archive", archived: true, company_id: s.company.id, version: s.company.version, title: s.company.name + " をアーカイブ" }), children: "この会社をアーカイブ" }),
+          (0, import_jsx_runtime31.jsx)("h3", { children: "アーカイブ済み会社" }),
+          archivedCompanies.length ? (0, import_jsx_runtime31.jsx)(GridTable, { heads: ["会社名", "操作"], rows: archivedCompanies.map((company) => [company.name, (0, import_jsx_runtime31.jsx)(Button, { variant: "outline", disabled: busy, onClick: () => ask({ type: "company_archive", archived: false, company_id: company.id, version: company.version, title: company.name + " を復元" }), children: "復元して運用を再開" })]) }) : (0, import_jsx_runtime31.jsx)("p", { className: "muted", children: "アーカイブ済み会社はありません。" })
+        ] }),
         !s ? /* @__PURE__ */ (0, import_jsx_runtime31.jsxs)("section", { className: "panel onboarding", children: [
           /* @__PURE__ */ (0, import_jsx_runtime31.jsx)("h2", { children: "\u4F1A\u793E\u3068\u4F1A\u8A08\u5E74\u5EA6\u3092\u767B\u9332" }),
           /* @__PURE__ */ (0, import_jsx_runtime31.jsx)("p", { children: "\u4F1A\u793E\u3054\u3068\u306B\u5E33\u7C3F\u3092\u5206\u3051\u3066\u4FDD\u5B58\u3057\u307E\u3059\u3002\u307E\u305A\u30C6\u30B9\u30C8\u4F1A\u793E\u306710\u7A2E\u985E\u306E\u53D6\u5F15\u3092\u78BA\u8A8D\u3059\u308B\u3053\u3068\u3082\u3067\u304D\u307E\u3059\u3002" }),
@@ -25970,14 +25987,14 @@ function AccountingApp() {
           }, children: "\u65E2\u5B58\u306E\u30C6\u30B9\u30C8\u4F1A\u793E\u3092\u958B\u304F" })
         ] }) : /* @__PURE__ */ (0, import_jsx_runtime31.jsxs)(import_jsx_runtime31.Fragment, { children: [
           ["\u30C0\u30C3\u30B7\u30E5\u30DC\u30FC\u30C9", "\u4ED5\u8A33\u5E33", "\u7DCF\u52D8\u5B9A\u5143\u5E33", "\u8A66\u7B97\u8868", "P/L", "B/S", "\u6D88\u8CBB\u7A0E\u96C6\u8A08\u8868"].includes(page) && /* @__PURE__ */ (0, import_jsx_runtime31.jsxs)("section", { className: "periodbar", children: [
-            /* @__PURE__ */ (0, import_jsx_runtime31.jsx)(Field, { label: "\u4F1A\u8A08\u5E74\u5EA6", children: /* @__PURE__ */ (0, import_jsx_runtime31.jsx)(Choice, { value: yearId, onChange: (id) => selectYear(s, id), options: s.years.map((y) => [y.id, `${y.start} \u301C ${y.end}`]) }) }),
+            /* @__PURE__ */ (0, import_jsx_runtime31.jsx)(Field, { label: "\u4F1A\u8A08\u5E74\u5EA6", children: /* @__PURE__ */ (0, import_jsx_runtime31.jsx)(Choice, { value: yearId, onChange: (id) => selectYear(s, id), options: [...s.years].sort((a, b) => a.start.localeCompare(b.start)).map((y) => [y.id, `${y.start} \u301C ${y.end}`]) }) }),
             /* @__PURE__ */ (0, import_jsx_runtime31.jsx)(Field, { label: "\u958B\u59CB\u65E5", children: /* @__PURE__ */ (0, import_jsx_runtime31.jsx)(Input, { type: "date", value: start, onChange: (e) => setStart(e.target.value) }) }),
             /* @__PURE__ */ (0, import_jsx_runtime31.jsx)(Field, { label: "\u7D42\u4E86\u65E5", children: /* @__PURE__ */ (0, import_jsx_runtime31.jsx)(Input, { type: "date", value: end, onChange: (e) => setEnd(e.target.value) }) }),
             /* @__PURE__ */ (0, import_jsx_runtime31.jsx)(Field, { label: "\u6708\u6B21\u30FB\u5E74\u5EA6", children: /* @__PURE__ */ (0, import_jsx_runtime31.jsx)(Choice, { value: s.periods.find((p) => p.start === start && p.end === end)?.id || "year", onChange: (id) => {
               const p = s.periods.find((p2) => p2.id === id) || s.years.find((y) => y.id === yearId);
               setStart(p.start);
               setEnd(p.end);
-            }, options: [["year", "\u5E74\u5EA6\u5168\u4F53"], ...s.periods.filter((p) => p.year_id === yearId).map((p) => [p.id, `${p.start.slice(0, 7)} / ${p.status}`])] }) })
+            }, options: [["year", "\u5E74\u5EA6\u5168\u4F53"], ...s.periods.filter((p) => p.year_id === yearId).sort((a, b) => a.start.localeCompare(b.start)).map((p) => [p.id, `${p.start.slice(0, 7)} / ${p.status}`])] }) })
           ] }),
           !report && ["\u30C0\u30C3\u30B7\u30E5\u30DC\u30FC\u30C9", "\u4ED5\u8A33\u5E33", "\u7DCF\u52D8\u5B9A\u5143\u5E33", "\u8A66\u7B97\u8868", "P/L", "B/S", "\u6D88\u8CBB\u7A0E\u96C6\u8A08\u8868"].includes(page) && /* @__PURE__ */ (0, import_jsx_runtime31.jsx)("div", { className: "alert", children: "\u96C6\u8A08\u671F\u9593\u306F\u540C\u4E00\u4F1A\u8A08\u5E74\u5EA6\u5185\u3067\u6B63\u3057\u304F\u6307\u5B9A\u3057\u3066\u304F\u3060\u3055\u3044\u3002" }),
           page === "\u30C0\u30C3\u30B7\u30E5\u30DC\u30FC\u30C9" && report && /* @__PURE__ */ (0, import_jsx_runtime31.jsxs)(import_jsx_runtime31.Fragment, { children: [
@@ -26087,7 +26104,7 @@ function AccountingApp() {
                   money2(l.opening),
                   " \u5186"
                 ] }),
-                /* @__PURE__ */ (0, import_jsx_runtime31.jsx)(GridTable, { heads: ["\u65E5\u4ED8", "\u4ED5\u8A33\u756A\u53F7", "\u6458\u8981", "\u76F8\u624B\u79D1\u76EE", "\u501F\u65B9\uFF08\u5186\uFF09", "\u8CB8\u65B9\uFF08\u5186\uFF09", "\u6B8B\u9AD8\uFF08\u5186\uFF09"], rows: l.rows.map((r2) => [r2.date, r2.journal_number, r2.description, r2.counter_account, money2(r2.debit_amount), money2(r2.credit_amount), money2(r2.balance)]) }),
+                /* @__PURE__ */ (0, import_jsx_runtime31.jsx)(GridTable, { heads: ["\u65E5\u4ED8", "\u4ED5\u8A33\u756A\u53F7", "\u6458\u8981", "\u76F8\u624B\u79D1\u76EE", "\u501F\u65B9\uFF08\u5186\uFF09", "\u8CB8\u65B9\uFF08\u5186\uFF09", "\u6B8B\u9AD8\uFF08\u5186\uFF09"], rows: l.rows.map((r) => [r.date, r.journal_number, r.description, r.counter_account, money2(r.debit_amount), money2(r.credit_amount), money2(r.balance)]) }),
                 /* @__PURE__ */ (0, import_jsx_runtime31.jsxs)("p", { className: "total", children: [
                   "\u671F\u672B\u6B8B\u9AD8\uFF1A",
                   money2(l.closing),
@@ -26141,14 +26158,14 @@ function AccountingApp() {
               /* @__PURE__ */ (0, import_jsx_runtime31.jsx)(Button, { onClick: () => setModal({ type: "year", start: "", end: "" }), children: "\u7FCC\u5E74\u5EA6\u3092\u8FFD\u52A0" })
             ] }),
             /* @__PURE__ */ (0, import_jsx_runtime31.jsx)("p", { className: "muted", children: "CLOSED\u306F\u7406\u7531\u3092\u8A18\u9332\u3057\u3066\u518DOPEN\u3067\u304D\u307E\u3059\u3002LOCKED\u306F\u89E3\u9664\u3067\u304D\u307E\u305B\u3093\u3002\u5E74\u5EA6\u3068\u6708\u6B21\u306E\u4E21\u65B9\u304COPEN\u306E\u5834\u5408\u3060\u3051\u4ED5\u8A33\u3092\u66F4\u65B0\u3067\u304D\u307E\u3059\u3002" }),
-            s.years.map((y) => /* @__PURE__ */ (0, import_jsx_runtime31.jsxs)("div", { className: "year-block", children: [
+            [...s.years].sort((a, b) => a.start.localeCompare(b.start)).map((y) => /* @__PURE__ */ (0, import_jsx_runtime31.jsxs)("div", { className: "year-block", children: [
               (0, import_jsx_runtime31.jsx)(OpeningBalances, { s, year: y, act, busy }, `${s.company.id}:${y.id}:${s.company.version}`),
               /* @__PURE__ */ (0, import_jsx_runtime31.jsxs)("h3", { children: [
                 y.start,
                 " \u301C ",
                 y.end
               ] }),
-              /* @__PURE__ */ (0, import_jsx_runtime31.jsx)(GridTable, { heads: ["\u7A2E\u5225", "\u671F\u9593", "\u72B6\u614B", "\u6700\u7D42\u5909\u66F4", "\u64CD\u4F5C"], rows: [[y, "years"], ...s.periods.filter((p) => p.year_id === y.id).map((p) => [p, "periods"])].map(([p, target]) => [target === "years" ? "\u4F1A\u8A08\u5E74\u5EA6" : "\u6708\u6B21", `${p.start} \u301C ${p.end}`, /* @__PURE__ */ (0, import_jsx_runtime31.jsx)("span", { className: "status " + p.status, children: p.status }), p.changed_at ? new Date(p.changed_at).toLocaleString("ja-JP", { timeZone: "Asia/Tokyo" }) : "\u4F5C\u6210\u6642", /* @__PURE__ */ (0, import_jsx_runtime31.jsx)("div", { className: "row", children: p.status !== "LOCKED" && ["OPEN", "CLOSED", "LOCKED"].filter((v) => v !== p.status).map((status) => /* @__PURE__ */ (0, import_jsx_runtime31.jsx)(Button, { variant: "outline", size: "sm", disabled: busy || target === "periods" && y.status !== "OPEN", onClick: () => ask({ type: "period", target, id: p.id, status, title: `${p.start} \u301C ${p.end} \u3092 ${status} \u306B\u5909\u66F4` }), children: status === "OPEN" ? "\u518DOPEN" : status === "CLOSED" ? "CLOSE" : "LOCK" }, status)) })]) })
+              /* @__PURE__ */ (0, import_jsx_runtime31.jsx)(GridTable, { heads: ["\u7A2E\u5225", "\u671F\u9593", "\u72B6\u614B", "\u6700\u7D42\u5909\u66F4", "\u64CD\u4F5C"], rows: [[y, "years"], ...s.periods.filter((p) => p.year_id === y.id).sort((a, b) => a.start.localeCompare(b.start)).map((p) => [p, "periods"])].map(([p, target]) => [target === "years" ? "\u4F1A\u8A08\u5E74\u5EA6" : "\u6708\u6B21", `${p.start} \u301C ${p.end}`, /* @__PURE__ */ (0, import_jsx_runtime31.jsx)("span", { className: "status " + p.status, children: p.status }), p.changed_at ? new Date(p.changed_at).toLocaleString("ja-JP", { timeZone: "Asia/Tokyo" }) : "\u4F5C\u6210\u6642", /* @__PURE__ */ (0, import_jsx_runtime31.jsx)("div", { className: "row", children: p.status !== "LOCKED" && ["OPEN", "CLOSED", "LOCKED"].filter((v) => v !== p.status).map((status) => /* @__PURE__ */ (0, import_jsx_runtime31.jsx)(Button, { variant: "outline", size: "sm", disabled: busy || target === "periods" && y.status !== "OPEN", onClick: () => ask({ type: "period", target, id: p.id, status, title: `${p.start} \u301C ${p.end} \u3092 ${status} \u306B\u5909\u66F4` }), children: status === "OPEN" ? "\u518DOPEN" : status === "CLOSED" ? "CLOSE" : "LOCK" }, status)) })]) })
             ] }, y.id))
           ] }),
           ["\u6D88\u8CBB\u7A0E\u96C6\u8A08\u8868", "\u7A0E\u533A\u5206\u30FB\u8A2D\u5B9A"].includes(page) && /* @__PURE__ */ (0, import_jsx_runtime31.jsx)(TaxWorkspace, { s, start, end, page, act, onPrepare: (c) => {
