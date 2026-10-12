@@ -15,7 +15,7 @@
   "original-migrations/0001_accounting_guards.sql": "a79affb24b3a4250bd1e1ac3ff69d5239f38fc326513c8eb03103b0c4fef278a",
   "original-migrations/0003_tax_guards.sql": "0080d906e4c5a9354468e973eb54bb351515d8aeb997d4b0d5adae4e95205f8e",
   "sql/01-create-tables.sql": "03f1944f606acf1b601ebd966fff957140888ef880e285fc7455d1e89bf2dad9",
-  "sql/02-data-PARTIAL.sql": "393c43605ca595dfe8fb46e29f808a2b2f092cc99a6a00bf6c4825b51ecb46a0",
+  "sql/02-data-PARTIAL.sql": "35e4348822f5c36025c9cc53d38f18388349ab611a9f83ed7044b4e525a5933d",
   "lib/core.js": "ff72b3dc781a32cf8e37f42802296ae131d39f2fe23363def2d9dc0e5169e78c",
   "lib/csv-import.js": "867f1a89841c295d7bbed57ba7f4eb0e03d739079ef2c218430acf6e347fd2bf",
   "lib/csv-transfer.js": "eb12ca7a3e5e42e15f09c2b2cd253c2448def7d3ea6d1a9aa2991d94351ac6ee",
