@@ -25914,7 +25914,7 @@ function AccountingApp() {
       /* @__PURE__ */ (0, import_jsx_runtime31.jsxs)(SidebarHeader, { className: "brand", children: [
         /* @__PURE__ */ (0, import_jsx_runtime31.jsx)(BookOpen, {}),
         /* @__PURE__ */ (0, import_jsx_runtime31.jsxs)("div", { children: [
-          "会計帳簿",
+          "もんじゃ会計",
           /* @__PURE__ */ (0, import_jsx_runtime31.jsx)("small", { children: "/ Ver 0.1" })
         ] })
       ] }),

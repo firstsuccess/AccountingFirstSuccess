@@ -58,7 +58,10 @@ const server=http.createServer(async(req,res)=>{
  if(requestPath.startsWith('/api/'))return json(res,{error:'ログアウトしました。再度ログインしてください'},401);
  res.writeHead(303,{Location:'/login'});return res.end();
  }
- const u=authenticate(req);if(!u){res.writeHead(401,{'WWW-Authenticate':'Basic realm="Monja Accounting", charset="UTF-8"','Content-Type':'text/plain; charset=utf-8'});return res.end('サインインが必要です');}
+ const u=authenticate(req);if(!u){
+ if(requestPath.startsWith('/api/'))return json(res,{error:'サインインが必要です'},401);
+ res.writeHead(303,{Location:'/login'});return res.end();
+ }
  try{
  const url=new URL(req.url,publicOrigin);
  if(url.pathname==='/api/accounting'){

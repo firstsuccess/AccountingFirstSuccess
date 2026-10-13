@@ -180,7 +180,7 @@ function AccountingApp() {
       /* @__PURE__ */ jsxs(SidebarHeader, { className: "brand", children: [
         /* @__PURE__ */ jsx(BookOpen, {}),
         /* @__PURE__ */ jsxs("div", { children: [
-          "会計帳簿",
+          "もんじゃ会計",
           /* @__PURE__ */ jsx("small", { children: "/ Ver 0.1" })
         ] })
       ] }),

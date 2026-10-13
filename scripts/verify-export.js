@@ -15,7 +15,10 @@ fs.writeFileSync(users,JSON.stringify([{username:'verification',owner:test.owner
 const server=spawn(process.execPath,['server.js'],{cwd:new URL('../',import.meta.url),env:{...process.env,AUTH_USERS_FILE:users,PUBLIC_ORIGIN:'https://localhost',PORT:'3137'},stdio:['ignore','pipe','pipe']});
 try{
  await new Promise((resolve,reject)=>{server.stdout.once('data',resolve);server.once('error',reject);server.once('exit',code=>reject(new Error('Server exited '+code)));setTimeout(()=>reject(new Error('Start timed out')),5000).unref();});
- let r=await fetch('http://127.0.0.1:3137/');assert.equal(r.status,401);
+ let r=await fetch('http://127.0.0.1:3137/',{redirect:'manual'});assert.equal(r.status,303);assert.equal(r.headers.get('location'),'/login');assert.equal(r.headers.get('www-authenticate'),null);
+ r=await fetch('http://127.0.0.1:3137/');assert.equal(r.status,200);assert.equal(new URL(r.url).pathname,'/login');assert.match(await r.text(),/autocomplete="current-password"/);
+ r=await fetch('http://127.0.0.1:3137/api/accounting');assert.equal(r.status,401);assert.equal(r.headers.get('www-authenticate'),null);assert.equal((await r.json()).error,'サインインが必要です');
+ for(const file of ['../screen-source/app/accounting-app.js','../public/app.js'])assert.match(fs.readFileSync(new URL(file,import.meta.url),'utf8'),/"もんじゃ会計"/);
  const headers={Authorization:'Basic '+Buffer.from('verification:'+password).toString('base64')};
  r=await fetch('http://127.0.0.1:3137/',{headers});assert.equal(r.status,200);assert.match(await r.text(),/id="root"/);
  for(const file of ['app.js','styles.css']){r=await fetch('http://127.0.0.1:3137/'+file,{headers});assert.equal(r.status,200);assert.ok((await r.text()).length>1000);}
@@ -36,7 +39,7 @@ try{
  const session=sessionCookie.split(';')[0];
  r=await fetch(origin,{headers:{Cookie:session}});assert.equal(r.status,200);
  r=await fetch(origin+'/api/logout',{method:'POST',headers:{Origin:origin,Cookie:session}});assert.equal(r.status,200);
- r=await fetch(origin,{headers:{Cookie:session},redirect:'manual'});assert.equal(r.status,401);
+ r=await fetch(origin,{headers:{Cookie:session},redirect:'manual'});assert.equal(r.status,303);assert.equal(r.headers.get('location'),'/login');assert.equal(r.headers.get('www-authenticate'),null);
  r=await fetch(origin+'/api/logout',{method:'POST',headers:{Origin:'https://localhost'}});assert.equal(r.status,200);assert.ok(r.headers.getSetCookie()[0].includes('Secure'));
  console.log('PASS: logout, cached Basic credential blocking, relogin, session revocation, local HTTP access with HTTPS configuration, cross-origin rejection, HTTPS secure cookies.');
  console.log('PASS: JavaScript HTTP startup, authentication, static assets, private-file isolation, existing test-company balanced report, snapshot JSON. SQL Server integration NOT tested.');
