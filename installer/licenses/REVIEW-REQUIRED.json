@@ -1,0 +1,146 @@
+﻿[
+    {
+        "name":  "@azure/core-client",
+        "version":  "1.11.1",
+        "declaredLicense":  null,
+        "filesFound":  [
+                           null
+                       ],
+        "path":  "@azure\\core-client\\dist\\browser"
+    },
+    {
+        "name":  "@azure/core-client",
+        "version":  "1.11.1",
+        "declaredLicense":  null,
+        "filesFound":  [
+                           null
+                       ],
+        "path":  "@azure\\core-client\\dist\\commonjs"
+    },
+    {
+        "name":  "@azure/core-client",
+        "version":  "1.11.1",
+        "declaredLicense":  null,
+        "filesFound":  [
+                           null
+                       ],
+        "path":  "@azure\\core-client\\dist\\esm"
+    },
+    {
+        "name":  "@azure/core-client",
+        "version":  "1.11.1",
+        "declaredLicense":  null,
+        "filesFound":  [
+                           null
+                       ],
+        "path":  "@azure\\core-client\\dist\\react-native"
+    },
+    {
+        "name":  "@azure/identity",
+        "version":  "4.13.3",
+        "declaredLicense":  null,
+        "filesFound":  [
+                           null
+                       ],
+        "path":  "@azure\\identity\\dist\\browser"
+    },
+    {
+        "name":  "@azure/identity",
+        "version":  "4.13.3",
+        "declaredLicense":  null,
+        "filesFound":  [
+                           null
+                       ],
+        "path":  "@azure\\identity\\dist\\commonjs"
+    },
+    {
+        "name":  "@azure/identity",
+        "version":  "4.13.3",
+        "declaredLicense":  null,
+        "filesFound":  [
+                           null
+                       ],
+        "path":  "@azure\\identity\\dist\\esm"
+    },
+    {
+        "name":  "@azure/identity",
+        "version":  "4.13.3",
+        "declaredLicense":  null,
+        "filesFound":  [
+                           null
+                       ],
+        "path":  "@azure\\identity\\dist\\workerd"
+    },
+    {
+        "name":  "@azure-rest/core-client",
+        "version":  "2.9.0",
+        "declaredLicense":  null,
+        "filesFound":  [
+                           null
+                       ],
+        "path":  "@azure-rest\\core-client\\dist\\browser"
+    },
+    {
+        "name":  "@azure-rest/core-client",
+        "version":  "2.9.0",
+        "declaredLicense":  null,
+        "filesFound":  [
+                           null
+                       ],
+        "path":  "@azure-rest\\core-client\\dist\\commonjs"
+    },
+    {
+        "name":  "@azure-rest/core-client",
+        "version":  "2.9.0",
+        "declaredLicense":  null,
+        "filesFound":  [
+                           null
+                       ],
+        "path":  "@azure-rest\\core-client\\dist\\esm"
+    },
+    {
+        "name":  "@azure-rest/core-client",
+        "version":  "2.9.0",
+        "declaredLicense":  null,
+        "filesFound":  [
+                           null
+                       ],
+        "path":  "@azure-rest\\core-client\\dist\\react-native"
+    },
+    {
+        "name":  "@typespec/ts-http-runtime",
+        "version":  "0.3.9",
+        "declaredLicense":  null,
+        "filesFound":  [
+                           null
+                       ],
+        "path":  "@typespec\\ts-http-runtime\\dist\\browser"
+    },
+    {
+        "name":  "@typespec/ts-http-runtime",
+        "version":  "0.3.9",
+        "declaredLicense":  null,
+        "filesFound":  [
+                           null
+                       ],
+        "path":  "@typespec\\ts-http-runtime\\dist\\commonjs"
+    },
+    {
+        "name":  "@typespec/ts-http-runtime",
+        "version":  "0.3.9",
+        "declaredLicense":  null,
+        "filesFound":  [
+                           null
+                       ],
+        "path":  "@typespec\\ts-http-runtime\\dist\\esm"
+    },
+    {
+        "name":  "@typespec/ts-http-runtime",
+        "version":  "0.3.9",
+        "declaredLicense":  null,
+        "filesFound":  [
+                           null
+                       ],
+        "path":  "@typespec\\ts-http-runtime\\dist\\react-native"
+    }
+]

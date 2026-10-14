@@ -1,0 +1,16 @@
+<service>
+  <id>MonjaAccounting</id>
+  <name>もんじゃ会計</name>
+  <description>MONJA Accounting Web Server</description>
+
+  <executable>%BASE%\..\runtime\node.exe</executable>
+  <arguments>--env-file=.env server.js</arguments>
+  <workingdirectory>%BASE%\..</workingdirectory>
+
+  <startmode>Automatic</startmode>
+  <delayedAutoStart>true</delayedAutoStart>
+
+  <onfailure action="restart" delay="10 sec"/>
+
+  <log mode="roll"/>
+</service>

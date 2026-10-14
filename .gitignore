@@ -8,3 +8,4 @@ logs/
 *.bak
 *.bak.*
 .git/
+*.exe
