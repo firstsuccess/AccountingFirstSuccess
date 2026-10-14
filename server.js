@@ -7,6 +7,8 @@ import {pool,query,load,save} from './lib/database.js';
 import {tables,createCompany,mutate,csv,csvColumns} from './lib/core.js';
 import {transferRows,transferColumns,backupLineRows,backupLineColumns} from './lib/csv-transfer.js';
 import {prepareImport} from './lib/csv-import.js';
+import {querySubaccounts} from './lib/subaccount-query.js';
+import {sql} from './lib/database.js';
 const root=path.dirname(fileURLToPath(import.meta.url));
 const users=JSON.parse(fs.readFileSync(path.resolve(root,process.env.AUTH_USERS_FILE||'users.json'),'utf8'));
 if(!Array.isArray(users)||!users.length)throw new Error('認証ユーザーを設定してください');
@@ -67,6 +69,10 @@ const server=http.createServer(async(req,res)=>{
  if(url.pathname==='/api/accounting'){
  const db=await pool();
  if(req.method==='GET'){
+ if(['subaccount-balances','subaccount-ledger'].includes(url.searchParams.get('view'))){
+ const tx=new sql.Transaction(db);await tx.begin(sql.ISOLATION_LEVEL.SERIALIZABLE);
+ try{const result=await querySubaccounts(tx,u.owner,url.searchParams);await tx.commit();return json(res,result);}catch(e){try{await tx.rollback();}catch{}throw e;}
+ }
  const id=url.searchParams.get('company');
  if(!id){const r=await query(db,'SELECT data,version FROM dbo.companies WHERE owner=@p0 ORDER BY id',[u.owner]);const companies=r.recordset.map(r=>({...JSON.parse(r.data),version:r.version}));return json(res,{companies:companies.filter(c=>!c.archived),archived_companies:companies.filter(c=>c.archived),user:u.displayName||u.username});}
  const s=await load(db,id,u.owner);

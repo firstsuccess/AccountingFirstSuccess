@@ -1,4 +1,5 @@
-import { expandTaxLines, initialTaxCodes, taxFields, rateBps, roundingNames } from "./tax";
+import { expandTaxLines, initialTaxCodes, taxFields, rateBps, roundingNames } from "./tax.js";
+import {cleanSubaccount,subaccountName,inputModes,assistModes} from './subaccounts.js';
 const tables = ["accounts", "subaccounts", "years", "periods", "journals", "lines", "audit", "tax_codes"];
 const sections = { CURRENT_ASSET: "\u6D41\u52D5\u8CC7\u7523", FIXED_ASSET: "\u56FA\u5B9A\u8CC7\u7523", CURRENT_LIABILITY: "\u6D41\u52D5\u8CA0\u50B5", LONG_LIABILITY: "\u56FA\u5B9A\u8CA0\u50B5", EQUITY: "\u7D14\u8CC7\u7523", SALES: "\u58F2\u4E0A\u9AD8", COGS: "\u58F2\u4E0A\u539F\u4FA1", SGA: "\u8CA9\u58F2\u8CBB\u53CA\u3073\u4E00\u822C\u7BA1\u7406\u8CBB", OTHER_REVENUE: "\u55B6\u696D\u5916\u53CE\u76CA", OTHER_EXPENSE: "\u55B6\u696D\u5916\u8CBB\u7528", EXTRA_REVENUE: "\u7279\u5225\u5229\u76CA", EXTRA_EXPENSE: "\u7279\u5225\u640D\u5931", TAX: "\u6CD5\u4EBA\u7A0E\u7B49" };
 const sectionTypes = { CURRENT_ASSET: "ASSET", FIXED_ASSET: "ASSET", CURRENT_LIABILITY: "LIABILITY", LONG_LIABILITY: "LIABILITY", EQUITY: "EQUITY", SALES: "REVENUE", COGS: "EXPENSE", SGA: "EXPENSE", OTHER_REVENUE: "REVENUE", OTHER_EXPENSE: "EXPENSE", EXTRA_REVENUE: "REVENUE", EXTRA_EXPENSE: "EXPENSE", TAX: "EXPENSE" };
@@ -178,13 +179,22 @@ function mutate(input, command, user) {
     const y = open(s, date(c.transaction_date));
     assert(Array.isArray(c.lines) && c.lines.length >= 2 && c.lines.length <= 100, "\u4ED5\u8A33\u660E\u7D30\u306F2\u301C100\u884C\u3067\u3059");
     const rev = (old?.revision || 0) + 1, id = old?.id || uid();
+    assert(!c.lines.some(l => l.subaccount_search?.includes('*')), '補助科目の検索条件は保存できません。候補を選択してください');
     const expanded = expandTaxLines(s, c.lines, c.transaction_date, old ? currentLines(s, old) : [], old?.transaction_date);
     const ls = expanded.map((l) => {
       const a = s.accounts.find((a2) => a2.id === l.account_id);
       assert(a?.active || isOpening && plan.rows.some((r) => r.id === a?.id && !r.active), "\u6709\u52B9\u306A\u52D8\u5B9A\u79D1\u76EE\u3092\u9078\u629E\u3057\u3066\u304F\u3060\u3055\u3044");
       const sub = l.subaccount_id ? s.subaccounts.find((a2) => a2.id === l.subaccount_id) : null;
       assert(!l.subaccount_id || sub?.active && sub.account_id === a.id, "\u88DC\u52A9\u79D1\u76EE\u306E\u6240\u5C5E\u30FB\u6709\u52B9\u72B6\u614B\u304C\u4E0D\u6B63\u3067\u3059");
-      return { id: l.id, journal_id: id, revision: rev, account_id: a.id, subaccount_id: sub?.id || null, debit_amount: l.debit_amount, credit_amount: l.credit_amount, line_description: String(l.line_description || "").slice(0, 300), ...Object.fromEntries(taxFields.map((k) => [k, l[k] ?? null])), entry_side: l.entry_side || null, is_tax_line: l.is_tax_line, tax_source_line_id: l.tax_source_line_id };
+      const previous = old && currentLines(s, old).find(x => x.id === l.original_line_id);
+      const incoming = l.subaccount_name === undefined ? (sub?.name || '') : l.subaccount_name;
+      const unchangedLegacy = previous && previous.account_id === a.id && subaccountName(s,previous) === incoming;
+      const name = unchangedLegacy ? incoming : cleanSubaccount(incoming);
+      if (!isOpening && !l.is_tax_line) {
+        assert((a.subaccount_input || 'OPTIONAL') !== 'REQUIRED' || name.trim(), '補助科目が必須です：' + a.account_name);
+        assert((a.subaccount_input || 'OPTIONAL') !== 'NONE' || !name || unchangedLegacy, '補助科目は不要の設定です：' + a.account_name);
+      }
+      return { id: l.id, journal_id: id, revision: rev, account_id: a.id, subaccount_id: sub?.id || null, subaccount_name: name, debit_amount: l.debit_amount, credit_amount: l.credit_amount, line_description: String(l.line_description || "").slice(0, 300), ...Object.fromEntries(taxFields.map((k) => [k, l[k] ?? null])), entry_side: l.entry_side || null, is_tax_line: l.is_tax_line, tax_source_line_id: l.tax_source_line_id };
     });
     assert(sum(ls, "debit_amount") === sum(ls, "credit_amount"), "\u8CB8\u501F\u304C\u4E00\u81F4\u3057\u3066\u3044\u307E\u305B\u3093");
     const journal_kind = c.journal_kind || old?.journal_kind || "STANDARD";
@@ -256,6 +266,9 @@ function mutate(input, command, user) {
     const a = { id: old?.id || uid(), account_code: code, account_name: str(c.account_name, 100), account_type: type, statement_type: ["ASSET", "LIABILITY", "EQUITY"].includes(type) ? "BS" : "PL", normal_balance: normal, section, tag: ["", "CASH", "AR", "AP", "RETAINED"].includes(c.tag) ? c.tag : "", default_tax_code: c.default_tax_code ?? old?.default_tax_code ?? "UNSPECIFIED", display_order: Number(code) || 0, active: c.active !== false };
     assert(a.default_tax_code === "UNSPECIFIED" || s.tax_codes.some((t) => t.tax_code === a.default_tax_code && t.active), "\u6709\u52B9\u306A\u30C7\u30D5\u30A9\u30EB\u30C8\u7A0E\u533A\u5206\u3092\u9078\u629E\u3057\u3066\u304F\u3060\u3055\u3044");
     if (Object.values(s.company.tax_accounts || {}).includes(a.id)) assert(old?.section === a.section && a.default_tax_code === "OUT", "\u6D88\u8CBB\u7A0E\u79D1\u76EE\u306E\u533A\u5206\u30FB\u7A0E\u533A\u5206\u306F\u56FA\u5B9A\u3067\u3059");
+    a.subaccount_input = c.subaccount_input ?? old?.subaccount_input ?? 'OPTIONAL';
+    a.subaccount_assist = c.subaccount_assist ?? old?.subaccount_assist ?? 'NONE';
+    assert(Object.hasOwn(inputModes,a.subaccount_input) && Object.hasOwn(assistModes,a.subaccount_assist), '補助科目設定が不正です');
     if (old)
       s.accounts[s.accounts.indexOf(old)] = a;
     else
@@ -405,6 +418,8 @@ csvColumns.tax_codes = ["id", "tax_code", "tax_name", "tax_type", "tax_rate", "e
 csvColumns.lines.push(...taxFields.filter((k) => !csvColumns.lines.includes(k)), "is_tax_line", "tax_source_line_id", "entry_side");
 csvColumns.company.push("tax_rounding", "tax_accounts", "accounting_method", "archived", "archive_changed_at", "archive_changed_by");
 csvColumns.journals.push("journal_kind");
+csvColumns.lines.push("subaccount_name");
+csvColumns.accounts.push("subaccount_input", "subaccount_assist");
 export {
   assert,
   canEdit,

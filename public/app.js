@@ -24802,7 +24802,7 @@ function editorLines(s, j) {
   return currentLines(s, j).filter((l) => !l.is_tax_line).map((l) => {
     const side = l.entry_side || (l.debit_amount ? "DEBIT" : "CREDIT");
     const n = l.input_amount ?? (l.debit_amount || l.credit_amount);
-    return { ...l, original_line_id: l.id, debit_amount: side === "DEBIT" ? n : 0, credit_amount: side === "CREDIT" ? n : 0, amount_input_type: l.amount_input_type || "NET", tax_override: l.tax_status === "SET" && l.tax_amount !== l.calculated_tax_amount ? String(l.tax_amount) : "", tax_adjustment_reason: l.tax_adjustment_reason || "" };
+    return { ...l, subaccount_name: subaccountName(s,l), original_line_id: l.id, debit_amount: side === "DEBIT" ? n : 0, credit_amount: side === "CREDIT" ? n : 0, amount_input_type: l.amount_input_type || "NET", tax_override: l.tax_status === "SET" && l.tax_amount !== l.calculated_tax_amount ? String(l.tax_amount) : "", tax_adjustment_reason: l.tax_adjustment_reason || "" };
   });
 }
 function TaxLineEditor({ s, editor, setEditor }) {
@@ -24815,7 +24815,7 @@ function TaxLineEditor({ s, editor, setEditor }) {
     error = e.message;
   }
   const sum = (key) => preview.reduce((n, l) => n + BigInt(l[key] || 0), 0n);
-  return /* @__PURE__ */ (0, import_jsx_runtime24.jsxs)(import_jsx_runtime24.Fragment, { children: [
+  return /* @__PURE__ */ (0, import_jsx_runtime24.jsxs)(import_react7.Fragment, { children: [
     /* @__PURE__ */ (0, import_jsx_runtime24.jsxs)("p", { className: "muted", children: [
       "\u6D88\u8CBB\u7A0E\uFF1A",
       roundingNames[s.company.tax_rounding || "FLOOR"],
@@ -24839,8 +24839,8 @@ function TaxLineEditor({ s, editor, setEditor }) {
         }
         return /* @__PURE__ */ (0, import_jsx_runtime24.jsxs)(TableRow, { children: [
           /* @__PURE__ */ (0, import_jsx_runtime24.jsxs)(TableCell, { children: [
-            /* @__PURE__ */ (0, import_jsx_runtime24.jsx)(Choose, { label: "\u52D8\u5B9A\u79D1\u76EE", value: l.account_id, options: [["", "\u79D1\u76EE\u3092\u9078\u629E"], ...s.accounts.filter((a) => a.active).map((a) => [a.id, a.account_name])], onChange: (v) => update({ account_id: v, subaccount_id: "", tax_code: s.accounts.find((a) => a.id === v)?.default_tax_code || "UNSPECIFIED", tax_override: "", tax_adjustment_reason: "" }) }),
-            /* @__PURE__ */ (0, import_jsx_runtime24.jsx)(Choose, { label: "\u88DC\u52A9\u79D1\u76EE", value: l.subaccount_id, options: [["", "\u6307\u5B9A\u306A\u3057"], ...s.subaccounts.filter((a) => a.active && a.account_id === l.account_id).map((a) => [a.id, a.name])], onChange: (v) => update({ subaccount_id: v }) })
+            /* @__PURE__ */ (0, import_jsx_runtime24.jsx)(Choose, { label: "\u52D8\u5B9A\u79D1\u76EE", value: l.account_id, options: [["", "\u79D1\u76EE\u3092\u9078\u629E"], ...s.accounts.filter((a) => a.active).map((a) => [a.id, a.account_name])], onChange: (v) => update({ account_id: v, subaccount_id: "", subaccount_name: "", subaccount_search: "", tax_code: s.accounts.find((a) => a.id === v)?.default_tax_code || "UNSPECIFIED", tax_override: "", tax_adjustment_reason: "" }) }),
+            (0, import_jsx_runtime24.jsx)(SubaccountInput, { s, editor, line: l, inputId:i, onChange:update })
           ] }),
           /* @__PURE__ */ (0, import_jsx_runtime24.jsx)(TableCell, { children: /* @__PURE__ */ (0, import_jsx_runtime24.jsx)(Choose, { label: "\u501F\u8CB8", value: side, options: [["DEBIT", "\u501F\u65B9"], ["CREDIT", "\u8CB8\u65B9"]], onChange: (v) => update({ entry_side: v, debit_amount: v === "DEBIT" ? value : 0, credit_amount: v === "CREDIT" ? value : 0 }) }) }),
           /* @__PURE__ */ (0, import_jsx_runtime24.jsx)(TableCell, { children: /* @__PURE__ */ (0, import_jsx_runtime24.jsx)(Choose, { label: "\u5165\u529B\u65B9\u5F0F", value: l.amount_input_type || "NET", options: [["NET", "\u7A0E\u629C"], ["GROSS", "\u7A0E\u8FBC"]], onChange: (v) => update({ amount_input_type: v }) }) }),
@@ -24865,7 +24865,7 @@ function TaxLineEditor({ s, editor, setEditor }) {
           ] }) }),
           /* @__PURE__ */ (0, import_jsx_runtime24.jsxs)(TableCell, { children: [
             /* @__PURE__ */ (0, import_jsx_runtime24.jsx)(Input, { "aria-label": "\u8ABF\u6574\u5F8C\u7A0E\u984D", type: "number", min: "0", step: "1", placeholder: "\u81EA\u52D5\u8A08\u7B97", value: l.tax_override ?? "", onChange: (e) => update({ tax_override: e.target.value }) }),
-            l.tax_override !== "" && l.tax_override != null && /* @__PURE__ */ (0, import_jsx_runtime24.jsxs)(import_jsx_runtime24.Fragment, { children: [
+            l.tax_override !== "" && l.tax_override != null && /* @__PURE__ */ (0, import_jsx_runtime24.jsxs)(import_react7.Fragment, { children: [
               /* @__PURE__ */ (0, import_jsx_runtime24.jsxs)("small", { children: [
                 "\u8ABF\u6574\u524D ",
                 money(calc?.calculated_tax_amount),
@@ -25713,7 +25713,7 @@ function AlertDialogCancel3({
 
 // export-source/app/accounting-app.tsx
 var import_jsx_runtime31 = __toESM(require_jsx_runtime(), 1);
-var nav = [["\u30C0\u30C3\u30B7\u30E5\u30DC\u30FC\u30C9", LayoutDashboard], ["\u4ED5\u8A33\u5165\u529B", PenLine], ["\u4ED5\u8A33\u5E33", List], ["\u7DCF\u52D8\u5B9A\u5143\u5E33", BookText], ["\u8A66\u7B97\u8868", Scale], ["P/L", ChartNoAxesCombined], ["B/S", Landmark], ["\u52D8\u5B9A\u79D1\u76EE", Tags], ["\u88DC\u52A9\u79D1\u76EE", FolderTree], ["\u4F1A\u8A08\u671F\u9593", CalendarDays], ["\u6D88\u8CBB\u7A0E\u96C6\u8A08\u8868", Scale], ["\u7A0E\u533A\u5206\u30FB\u8A2D\u5B9A", Tags], ["CSV\u53D6\u8FBC", Download], ["\u76E3\u67FB\u30ED\u30B0", RotateCcwClock], ["\u8A2D\u5B9A", Settings]];
+var nav = [["\u30C0\u30C3\u30B7\u30E5\u30DC\u30FC\u30C9", LayoutDashboard], ["\u4ED5\u8A33\u5165\u529B", PenLine], ["\u4ED5\u8A33\u5E33", List], ["\u7DCF\u52D8\u5B9A\u5143\u5E33", BookText], ["\u8A66\u7B97\u8868", Scale], ["P/L", ChartNoAxesCombined], ["B/S", Landmark], ["\u52D8\u5B9A\u79D1\u76EE", Tags], ["補助元帳・残高", FolderTree], ["\u88DC\u52A9\u79D1\u76EE", FolderTree], ["\u4F1A\u8A08\u671F\u9593", CalendarDays], ["\u6D88\u8CBB\u7A0E\u96C6\u8A08\u8868", Scale], ["\u7A0E\u533A\u5206\u30FB\u8A2D\u5B9A", Tags], ["CSV\u53D6\u8FBC", Download], ["\u76E3\u67FB\u30ED\u30B0", RotateCcwClock], ["\u8A2D\u5B9A", Settings]];
 var money2 = (n) => BigInt(n || 0).toLocaleString("ja-JP");
 function Choice({ value, onChange, options, label = "\u9078\u629E" }) {
   return /* @__PURE__ */ (0, import_jsx_runtime31.jsxs)(Select2, { value: value || "_", onValueChange: (v) => onChange(v === "_ " ? "" : v === "_" ? "" : v), children: [
@@ -25782,6 +25782,78 @@ function OpeningBalances({ s, year, act, busy }) {
       (0, import_jsx_runtime31.jsx)(Button, { type: "submit", disabled: !changed || debit !== credit || !reason.trim(), children: "差額を期首残高仕訳として保存" })
     ] }) })
   ] });
+}
+
+// Shared rules; existing master IDs remain readable without rewriting history.
+const inputModes = { NONE: '不要', OPTIONAL: '任意', REQUIRED: '必須' };
+const assistModes = { COPY: '選択した補助科目を相手科目へ提案', BALANCE: '相手科目の残高がある補助科目を提案', NONE: '提案しない' };
+function subaccountName(s, line) {
+  return line.subaccount_name ?? s.subaccounts.find(x => x.id === line.subaccount_id && x.account_id === line.account_id)?.name ?? '';
+}
+function cleanSubaccount(value) {
+  if (typeof value !== 'string') throw new Error('補助科目名は文字列で指定してください');
+  const name = value.trim();
+  if (name.length > 300 || name.includes('*')) throw new Error('補助科目名は300文字以内です。検索条件の * は保存できません');
+  return name;
+}
+function wildcardLike(pattern) {
+  if (typeof pattern !== 'string' || pattern.length > 300) throw new Error('検索条件は300文字以内です');
+  return pattern.replace(/[~%_\[]/g, c => '~' + c).replaceAll('*', '%');
+}
+function oppositeLines(lines, source) {
+  const side = source.entry_side || (source.credit_amount ? 'CREDIT' : 'DEBIT');
+  return lines.map((line, index) => ({ line, index })).filter(x => x.line !== source && x.line.account_id && (x.line.entry_side || (x.line.credit_amount ? 'CREDIT' : 'DEBIT')) !== side);
+}
+
+
+const subMoney=n=>BigInt(n||0).toLocaleString('ja-JP');
+function SubaccountInput({s,editor,line,onChange,inputId}) {
+ const [query,setQuery]=(0, import_react8.useState)(subaccountName(s,line)),[rows,setRows]=(0, import_react8.useState)([]),[error,setError]=(0, import_react8.useState)(''),[focused,setFocused]=(0, import_react8.useState)(false),[highlight,setHighlight]=(0, import_react8.useState)(-1);
+ const account=s.accounts.find(a=>a.id===line.account_id),mode=account?.subaccount_input||'OPTIONAL';
+ const opposites=oppositeLines(editor.lines,line);
+ const balanceAssist=opposites.some(x=>s.accounts.find(a=>a.id===x.line.account_id)?.subaccount_assist==='BALANCE');
+ const copies=[...new Set(opposites.filter(x=>s.accounts.find(a=>a.id===x.line.account_id)?.subaccount_assist==='COPY').map(x=>subaccountName(s,x.line)).filter(Boolean))];
+ (0, import_react8.useEffect)(()=>{setQuery(subaccountName(s,line));},[line.subaccount_name,line.subaccount_id,line.account_id,s.company.id]);
+ (0, import_react8.useEffect)(()=>{
+  setRows([]);setError('');if(!focused||!account||!editor.transaction_date||mode==='NONE')return;
+  const controller=new AbortController();const timer=setTimeout(async()=>{
+   try{const p=new URLSearchParams({company:s.company.id,account:account.id,view:'subaccount-balances',start:editor.transaction_date,end:editor.transaction_date,search:query,candidates:'true',all:balanceAssist?'false':'true'});
+    const r=await fetch('/api/accounting?'+p,{signal:controller.signal});const d=await r.json();if(!r.ok)throw new Error(d.error);setRows(d.rows);
+   }catch(e){if(e.name!=='AbortError')setError(e.message);}
+  },250);return()=>{clearTimeout(timer);controller.abort();};
+ },[focused,query,account?.id,editor.transaction_date,s.company.id,s.company.version,balanceAssist,mode]);
+ function choose(name){setQuery(name);onChange({subaccount_name:name,subaccount_id:'',subaccount_search:''});setFocused(false);setHighlight(-1);}
+ const candidateNames=[...copies.filter(name=>!subaccountName(s,line)),...rows.map(r=>r.name)];
+ if(mode==='NONE'&&!subaccountName(s,line))return null;
+ return (0, import_jsx_runtime31.jsxs)('div',{className:'subaccount-combo',children:[
+  (0, import_jsx_runtime31.jsx)('input',{className:'subaccount-text',role:'combobox','aria-label':'補助科目名','aria-expanded':focused,'aria-controls':'sub-options-'+inputId,'aria-autocomplete':'list',maxLength:300,placeholder:mode==='REQUIRED'?'補助科目（必須）':'補助科目（自由入力）',value:query,onFocus:()=>setFocused(true),onBlur:()=>setFocused(false),onKeyDown:e=>{if(e.key==='Escape'){setFocused(false);setHighlight(-1);}else if((e.key==='ArrowDown'||e.key==='ArrowUp')&&candidateNames.length){e.preventDefault();setFocused(true);setHighlight(e.key==='ArrowDown'?Math.min(highlight+1,candidateNames.length-1):Math.max(highlight-1,0));}else if(e.key==='Enter'&&focused&&highlight>=0&&candidateNames[highlight]!==undefined){e.preventDefault();choose(candidateNames[highlight]);}},onChange:e=>{const q=e.target.value;setQuery(q);setFocused(true);setHighlight(-1);onChange(q.includes('*')?{subaccount_search:q}:{subaccount_name:q,subaccount_id:'',subaccount_search:''});}}),
+  query.includes('*')&&(0, import_jsx_runtime31.jsx)('small',{children:'検索条件です。候補を選択するか、* を除いて名前を入力してください。'}),
+  focused&&(0, import_jsx_runtime31.jsxs)('div',{id:'sub-options-'+inputId,role:'listbox',className:'subaccount-options',children:[
+   ...copies.filter(name=>!subaccountName(s,line)).map(name=>(0, import_jsx_runtime31.jsx)('button',{type:'button',role:'option','aria-selected':false,onMouseDown:e=>e.preventDefault(),onClick:()=>choose(name),children:'相手明細からの提案：'+name},'copy:'+name)),
+   ...rows.map(r=>(0, import_jsx_runtime31.jsx)('button',{type:'button',role:'option','aria-selected':r.name===subaccountName(s,line),onMouseDown:e=>e.preventDefault(),onClick:()=>choose(r.name),children:(r.name||'（補助科目なし）')+' / '+subMoney(r.balance)+' 円'},r.name)),
+   error&&(0, import_jsx_runtime31.jsx)('small',{className:'alert',children:error}),
+   (0, import_jsx_runtime31.jsx)('small',{children:'* で前方・後方・部分一致検索。候補がなくても自由入力できます。'})
+  ]})
+ ]});
+}
+function SubaccountWorkspace({s,start,end}) {
+ const [account,setAccount]=(0, import_react8.useState)(s.accounts[0]?.id||''),[search,setSearch]=(0, import_react8.useState)(''),[all,setAll]=(0, import_react8.useState)(false),[data,setData]=(0, import_react8.useState)(null),[name,setName]=(0, import_react8.useState)(null),[ledgerData,setLedgerData]=(0, import_react8.useState)(null),[offset,setOffset]=(0, import_react8.useState)(0),[error,setError]=(0, import_react8.useState)('');
+ (0, import_react8.useEffect)(()=>{setName(null);setOffset(0);},[account,start,end,s.company.id]);
+ (0, import_react8.useEffect)(()=>{
+  setData(null);setLedgerData(null);setError('');const c=new AbortController();
+  const timer=setTimeout(async()=>{try{
+   const p=new URLSearchParams({company:s.company.id,account,start,end,view:name===null?'subaccount-balances':'subaccount-ledger',search:search?'*'+search+'*':'',all:String(all),name:name||'',offset:String(offset)});
+   const r=await fetch('/api/accounting?'+p,{signal:c.signal});const d=await r.json();if(!r.ok)throw new Error(d.error);if(name===null)setData(d);else setLedgerData(d);
+  }catch(e){if(e.name!=='AbortError')setError(e.message);}},250);return()=>{clearTimeout(timer);c.abort();};
+ },[account,start,end,s.company.id,s.company.version,search,all,name,offset]);
+ return (0, import_jsx_runtime31.jsxs)('section',{className:'panel subaccount-report',children:[
+  (0, import_jsx_runtime31.jsx)('h2',{children:name===null?'補助科目別残高':'補助元帳'}),
+  (0, import_jsx_runtime31.jsx)('p',{className:'muted',children:'補助科目は仕訳明細の自由入力で使用できます。旧マスタのデータは保持しています。残高は科目の通常残高方向で表示します。期首差額・繰越損益の補助未配分分は「補助科目なし」に含みます。'}),
+  (0, import_jsx_runtime31.jsxs)('div',{className:'filters',children:[(0, import_jsx_runtime31.jsx)('select',{'aria-label':'勘定科目',value:account,onChange:e=>{setAccount(e.target.value);setOffset(0);},children:s.accounts.map(a=>(0, import_jsx_runtime31.jsx)('option',{value:a.id,children:a.account_code+' '+a.account_name},a.id))}),(0, import_jsx_runtime31.jsx)('input',{'aria-label':'補助科目名の部分一致検索',placeholder:'補助科目名の部分一致検索',value:search,onChange:e=>{setSearch(e.target.value);setName(null);setOffset(0);}}),(0, import_jsx_runtime31.jsxs)('label',{children:[(0, import_jsx_runtime31.jsx)('input',{type:'checkbox',checked:all,onChange:e=>{setAll(e.target.checked);setOffset(0);}}),'全件表示（残高ゼロを含む）']})]}),
+  error&&(0, import_jsx_runtime31.jsx)('p',{className:'alert',children:error}),
+  data&&(0, import_jsx_runtime31.jsxs)(import_react8.Fragment,{children:[(0, import_jsx_runtime31.jsx)('p',{children:'勘定科目残高（全補助・空白合計）：'+subMoney(data.total)+' 円'}),(0, import_jsx_runtime31.jsx)('table',{children:(0, import_jsx_runtime31.jsxs)(import_react8.Fragment,{children:[(0, import_jsx_runtime31.jsx)('thead',{children:(0, import_jsx_runtime31.jsx)('tr',{children:['補助科目','期首残高','借方','貸方','残高'].map(h=>(0, import_jsx_runtime31.jsx)('th',{children:h},h))})}),(0, import_jsx_runtime31.jsx)('tbody',{children:data.rows.map(r=>(0, import_jsx_runtime31.jsx)('tr',{children:[(0, import_jsx_runtime31.jsx)('td',{children:(0, import_jsx_runtime31.jsx)('button',{type:'button',onClick:()=>{setName(r.name);setOffset(0);},children:r.name||'（補助科目なし）'})}),...['opening','debit','credit','balance'].map(k=>(0, import_jsx_runtime31.jsx)('td',{children:subMoney(k==='opening'&&data.account.normal_balance==='CREDIT'?String(-BigInt(r[k])):r[k])},k))]},r.name))})]})}),data.has_more&&(0, import_jsx_runtime31.jsx)('p',{children:'次のページに続きます。'}),(0, import_jsx_runtime31.jsx)('button',{type:'button',disabled:offset===0,onClick:()=>setOffset(Math.max(0,offset-50)),children:'前の50件'}),(0, import_jsx_runtime31.jsx)('button',{type:'button',disabled:!data.has_more,onClick:()=>setOffset(offset+50),children:'次の50件'})]}),
+  ledgerData&&(0, import_jsx_runtime31.jsxs)(import_react8.Fragment,{children:[(0, import_jsx_runtime31.jsx)('button',{type:'button',onClick:()=>{setName(null);setOffset(0);},children:'残高一覧へ'}),(0, import_jsx_runtime31.jsx)('h3',{children:ledgerData.account.account_name+' / '+(name||'（補助科目なし）')}),(0, import_jsx_runtime31.jsx)('p',{children:'繰越残高：'+subMoney(ledgerData.opening)+' 円'}),(0, import_jsx_runtime31.jsx)('table',{children:(0, import_jsx_runtime31.jsxs)(import_react8.Fragment,{children:[(0, import_jsx_runtime31.jsx)('thead',{children:(0, import_jsx_runtime31.jsx)('tr',{children:['仕訳日','仕訳番号','勘定科目','補助科目','摘要','借方','貸方','残高'].map(h=>(0, import_jsx_runtime31.jsx)('th',{children:h},h))})}),(0, import_jsx_runtime31.jsx)('tbody',{children:ledgerData.rows.map(r=>(0, import_jsx_runtime31.jsx)('tr',{children:[r.date,r.number,ledgerData.account.account_name,name||'（補助科目なし）',r.description+(r.line_description?' / '+r.line_description:''),subMoney(r.debit),subMoney(r.credit),subMoney(r.balance)].map((v,i)=>(0, import_jsx_runtime31.jsx)('td',{children:v},i))},r.id))})]})}),(0, import_jsx_runtime31.jsx)('p',{children:'期末残高：'+subMoney(ledgerData.closing)+' 円'}),(0, import_jsx_runtime31.jsx)('button',{type:'button',disabled:offset===0,onClick:()=>setOffset(Math.max(0,offset-200)),children:'前の200件'}),(0, import_jsx_runtime31.jsx)('button',{type:'button',disabled:offset+ledgerData.rows.length>=(ledgerData.rows[0]?.total||0),onClick:()=>setOffset(offset+200),children:'次の200件'})]})
+ ]});
 }
 
 function AccountingApp() {
@@ -25881,7 +25953,7 @@ function AccountingApp() {
     if (j.transaction_date < start || j.transaction_date > end || !filters.deleted && j.status === "DELETED") return false;
     const ls = currentLines(s, j);
     const n = ls.reduce((n2, l) => n2 + BigInt(l.debit_amount), 0n);
-    return j.journal_number.includes(filters.number) && j.description.includes(filters.description) && j.counterparty.includes(filters.counterparty) && (!filters.account || ls.some((l) => l.account_id === filters.account && (!filters.sub || l.subaccount_id === filters.sub))) && (!filters.sub || ls.some((l) => l.subaccount_id === filters.sub)) && (!filters.min || n >= BigInt(filters.min)) && (!filters.max || n <= BigInt(filters.max));
+    return j.journal_number.includes(filters.number) && j.description.includes(filters.description) && j.counterparty.includes(filters.counterparty) && (!filters.account || ls.some((l) => l.account_id === filters.account && (!filters.sub || l.subaccount_id === filters.sub))) && (!filters.sub || ls.some((l) => l.subaccount_id === filters.sub)) && (!filters.subname || ls.some(l=>subaccountName(s,l).includes(filters.subname))) && (!filters.min || n >= BigInt(filters.min)) && (!filters.max || n <= BigInt(filters.max));
   }).sort((a, b) => a.transaction_date.localeCompare(b.transaction_date) || a.journal_number.localeCompare(b.journal_number)) || [], [s, start, end, filters]);
   (0, import_react8.useEffect)(() => {
     const context = document.modelContext;
@@ -25918,8 +25990,8 @@ function AccountingApp() {
           /* @__PURE__ */ (0, import_jsx_runtime31.jsx)("small", { children: "/ Ver 0.1" })
         ] })
       ] }),
-      /* @__PURE__ */ (0, import_jsx_runtime31.jsx)(SidebarContent, { children: /* @__PURE__ */ (0, import_jsx_runtime31.jsx)(SidebarMenu, { children: nav.map(([name, Icon2]) => /* @__PURE__ */ (0, import_jsx_runtime31.jsx)(SidebarMenuItem, { children: /* @__PURE__ */ (0, import_jsx_runtime31.jsxs)(SidebarMenuButton, { isActive: page === name, onClick: () => go(name), children: [
-        /* @__PURE__ */ (0, import_jsx_runtime31.jsx)(Icon2, {}),
+      /* @__PURE__ */ (0, import_jsx_runtime31.jsx)(SidebarContent, { children: /* @__PURE__ */ (0, import_jsx_runtime31.jsx)(SidebarMenu, { children: nav.map(([name, Icon]) => /* @__PURE__ */ (0, import_jsx_runtime31.jsx)(SidebarMenuItem, { children: /* @__PURE__ */ (0, import_jsx_runtime31.jsxs)(SidebarMenuButton, { isActive: page === name, onClick: () => go(name), children: [
+        /* @__PURE__ */ (0, import_jsx_runtime31.jsx)(Icon, {}),
         /* @__PURE__ */ (0, import_jsx_runtime31.jsx)("span", { children: name })
       ] }) }, name)) }) }),
       /* @__PURE__ */ (0, import_jsx_runtime31.jsxs)(SidebarFooter, { children: [
@@ -25985,7 +26057,7 @@ function AccountingApp() {
             if (t) loadCompany(t.id);
             else setError("\u65E2\u5B58\u306E\u300C\u30C6\u30B9\u30C8\u300D\u4F1A\u793E\u304C\u898B\u3064\u304B\u308A\u307E\u305B\u3093");
           }, children: "\u65E2\u5B58\u306E\u30C6\u30B9\u30C8\u4F1A\u793E\u3092\u958B\u304F" })
-        ] }) : /* @__PURE__ */ (0, import_jsx_runtime31.jsxs)(import_jsx_runtime31.Fragment, { children: [
+        ] }) : /* @__PURE__ */ (0, import_jsx_runtime31.jsxs)(import_react8.Fragment, { children: [
           ["\u30C0\u30C3\u30B7\u30E5\u30DC\u30FC\u30C9", "\u4ED5\u8A33\u5E33", "\u7DCF\u52D8\u5B9A\u5143\u5E33", "\u8A66\u7B97\u8868", "P/L", "B/S", "\u6D88\u8CBB\u7A0E\u96C6\u8A08\u8868"].includes(page) && /* @__PURE__ */ (0, import_jsx_runtime31.jsxs)("section", { className: "periodbar", children: [
             /* @__PURE__ */ (0, import_jsx_runtime31.jsx)(Field, { label: "\u4F1A\u8A08\u5E74\u5EA6", children: /* @__PURE__ */ (0, import_jsx_runtime31.jsx)(Choice, { value: yearId, onChange: (id) => selectYear(s, id), options: [...s.years].sort((a, b) => a.start.localeCompare(b.start)).map((y) => [y.id, `${y.start} \u301C ${y.end}`]) }) }),
             /* @__PURE__ */ (0, import_jsx_runtime31.jsx)(Field, { label: "\u958B\u59CB\u65E5", children: /* @__PURE__ */ (0, import_jsx_runtime31.jsx)(Input, { type: "date", value: start, onChange: (e) => setStart(e.target.value) }) }),
@@ -25997,7 +26069,7 @@ function AccountingApp() {
             }, options: [["year", "\u5E74\u5EA6\u5168\u4F53"], ...s.periods.filter((p) => p.year_id === yearId).sort((a, b) => a.start.localeCompare(b.start)).map((p) => [p.id, `${p.start.slice(0, 7)} / ${p.status}`])] }) })
           ] }),
           !report && ["\u30C0\u30C3\u30B7\u30E5\u30DC\u30FC\u30C9", "\u4ED5\u8A33\u5E33", "\u7DCF\u52D8\u5B9A\u5143\u5E33", "\u8A66\u7B97\u8868", "P/L", "B/S", "\u6D88\u8CBB\u7A0E\u96C6\u8A08\u8868"].includes(page) && /* @__PURE__ */ (0, import_jsx_runtime31.jsx)("div", { className: "alert", children: "\u96C6\u8A08\u671F\u9593\u306F\u540C\u4E00\u4F1A\u8A08\u5E74\u5EA6\u5185\u3067\u6B63\u3057\u304F\u6307\u5B9A\u3057\u3066\u304F\u3060\u3055\u3044\u3002" }),
-          page === "\u30C0\u30C3\u30B7\u30E5\u30DC\u30FC\u30C9" && report && /* @__PURE__ */ (0, import_jsx_runtime31.jsxs)(import_jsx_runtime31.Fragment, { children: [
+          page === "\u30C0\u30C3\u30B7\u30E5\u30DC\u30FC\u30C9" && report && /* @__PURE__ */ (0, import_jsx_runtime31.jsxs)(import_react8.Fragment, { children: [
             /* @__PURE__ */ (0, import_jsx_runtime31.jsx)("div", { className: "metrics", children: [["\u671F\u9593\u58F2\u4E0A", report.dashboard.sales], ["\u671F\u9593\u8CBB\u7528", report.dashboard.expenses], ["\u671F\u9593\u5229\u76CA", report.dashboard.profit], ["\u5E74\u5EA6\u7D2F\u8A08\u5229\u76CA", report.dashboard.ytd_profit]].map(([title, n], i) => /* @__PURE__ */ (0, import_jsx_runtime31.jsxs)("section", { className: "metric " + (i === 2 ? "highlight" : ""), children: [
               /* @__PURE__ */ (0, import_jsx_runtime31.jsx)("span", { children: title }),
               /* @__PURE__ */ (0, import_jsx_runtime31.jsxs)("strong", { children: [
@@ -26060,7 +26132,8 @@ function AccountingApp() {
             /* @__PURE__ */ (0, import_jsx_runtime31.jsxs)("div", { className: "filters", children: [
               [["number", "\u4ED5\u8A33\u756A\u53F7"], ["description", "\u6458\u8981"], ["counterparty", "\u53D6\u5F15\u5148"], ["min", "\u6700\u5C0F\u91D1\u984D"], ["max", "\u6700\u5927\u91D1\u984D"]].map(([key, label]) => /* @__PURE__ */ (0, import_jsx_runtime31.jsx)(Field, { label, children: /* @__PURE__ */ (0, import_jsx_runtime31.jsx)(Input, { value: filters[key], inputMode: key === "min" || key === "max" ? "numeric" : void 0, onChange: (e) => setFilters({ ...filters, [key]: key === "min" || key === "max" ? e.target.value.replace(/\D/g, "") : e.target.value }) }) }, key)),
               /* @__PURE__ */ (0, import_jsx_runtime31.jsx)(Field, { label: "\u52D8\u5B9A\u79D1\u76EE", children: /* @__PURE__ */ (0, import_jsx_runtime31.jsx)(Choice, { value: filters.account, onChange: (v) => setFilters({ ...filters, account: v, sub: "" }), options: [["", "\u3059\u3079\u3066"], ...s.accounts.map((a) => [a.id, a.account_name])] }) }),
-              /* @__PURE__ */ (0, import_jsx_runtime31.jsx)(Field, { label: "\u88DC\u52A9\u79D1\u76EE", children: /* @__PURE__ */ (0, import_jsx_runtime31.jsx)(Choice, { value: filters.sub, onChange: (v) => setFilters({ ...filters, sub: v }), options: [["", "\u3059\u3079\u3066"], ...s.subaccounts.filter((a) => !filters.account || a.account_id === filters.account).map((a) => [a.id, a.name])] }) })
+              /* @__PURE__ */ (0, import_jsx_runtime31.jsx)(Field, { label: "\u88DC\u52A9\u79D1\u76EE", children: /* @__PURE__ */ (0, import_jsx_runtime31.jsx)(Choice, { value: filters.sub, onChange: (v) => setFilters({ ...filters, sub: v }), options: [["", "\u3059\u3079\u3066"], ...s.subaccounts.filter((a) => !filters.account || a.account_id === filters.account).map((a) => [a.id, a.name])] }) }),
+              (0, import_jsx_runtime31.jsx)(Field,{label:"補助科目名検索",children:(0, import_jsx_runtime31.jsx)(Input,{value:filters.subname||"",onChange:e=>setFilters({...filters,subname:e.target.value})})})
             ] }),
             /* @__PURE__ */ (0, import_jsx_runtime31.jsxs)("div", { className: "section-title", children: [
               /* @__PURE__ */ (0, import_jsx_runtime31.jsxs)("label", { className: "row", children: [
@@ -26083,13 +26156,14 @@ function AccountingApp() {
                 /* @__PURE__ */ (0, import_jsx_runtime31.jsx)("small", { className: "block muted", children: j.counterparty })
               ] }), ls.filter((l) => l.debit_amount).map((l) => accountName(l.account_id)).join("\u30FB"), ls.filter((l) => l.credit_amount).map((l) => accountName(l.account_id)).join("\u30FB"), money2(ls.reduce((n, l) => n + BigInt(l.debit_amount), 0n)), /* @__PURE__ */ (0, import_jsx_runtime31.jsx)("span", { className: "status " + j.status, children: j.status }), /* @__PURE__ */ (0, import_jsx_runtime31.jsxs)("div", { className: "row", children: [
                 /* @__PURE__ */ (0, import_jsx_runtime31.jsx)(Button, { variant: "ghost", size: "sm", onClick: () => setDetail(j), children: "\u8A73\u7D30" }),
-                canEdit(s, j) && /* @__PURE__ */ (0, import_jsx_runtime31.jsxs)(import_jsx_runtime31.Fragment, { children: [
+                canEdit(s, j) && /* @__PURE__ */ (0, import_jsx_runtime31.jsxs)(import_react8.Fragment, { children: [
                   /* @__PURE__ */ (0, import_jsx_runtime31.jsx)(Button, { variant: "ghost", size: "sm", onClick: () => edit(j), children: "\u7DE8\u96C6" }),
                   /* @__PURE__ */ (0, import_jsx_runtime31.jsx)(Button, { variant: "ghost", size: "sm", onClick: () => ask({ type: "delete", id: j.id, title: `\u4ED5\u8A33 ${j.journal_number} \u3092\u8AD6\u7406\u524A\u9664` }), children: "\u8AD6\u7406\u524A\u9664" })
                 ] })
               ] })];
             }) })
           ] }),
+          page === "補助元帳・残高" && (0, import_jsx_runtime31.jsx)(SubaccountWorkspace,{s,start,end},s.company.id),
           page === "\u7DCF\u52D8\u5B9A\u5143\u5E33" && report && /* @__PURE__ */ (0, import_jsx_runtime31.jsxs)("section", { className: "panel", children: [
             /* @__PURE__ */ (0, import_jsx_runtime31.jsxs)("div", { className: "section-title", children: [
               /* @__PURE__ */ (0, import_jsx_runtime31.jsx)(Choice, { value: ledgerId, onChange: setLedgerId, options: s.accounts.map((a) => [a.id, `${a.account_code} ${a.account_name}`]) }),
@@ -26098,7 +26172,7 @@ function AccountingApp() {
             (() => {
               if (!ledgerId) return null;
               const l = ledger(s, ledgerId, start, end);
-              return /* @__PURE__ */ (0, import_jsx_runtime31.jsxs)(import_jsx_runtime31.Fragment, { children: [
+              return /* @__PURE__ */ (0, import_jsx_runtime31.jsxs)(import_react8.Fragment, { children: [
                 /* @__PURE__ */ (0, import_jsx_runtime31.jsxs)("p", { children: [
                   "\u671F\u9996\u6B8B\u9AD8\uFF1A",
                   money2(l.opening),
@@ -26182,7 +26256,7 @@ function AccountingApp() {
             listCompanies().catch(() => {
             });
           } }, s.company.id),
-          page === "\u8A2D\u5B9A" && /* @__PURE__ */ (0, import_jsx_runtime31.jsxs)(import_jsx_runtime31.Fragment, { children: [
+          page === "\u8A2D\u5B9A" && /* @__PURE__ */ (0, import_jsx_runtime31.jsxs)(import_react8.Fragment, { children: [
             /* @__PURE__ */ (0, import_jsx_runtime31.jsxs)("section", { className: "panel", children: [
               /* @__PURE__ */ (0, import_jsx_runtime31.jsxs)("div", { className: "section-title", children: [
                 /* @__PURE__ */ (0, import_jsx_runtime31.jsx)("h2", { children: "\u4F1A\u793E\u57FA\u672C\u60C5\u5831" }),
@@ -26240,19 +26314,21 @@ function AccountingApp() {
         /* @__PURE__ */ (0, import_jsx_runtime31.jsxs)("div", { className: "modalfields", children: [
           (modal.type === "create" || modal.type === "settings") && /* @__PURE__ */ (0, import_jsx_runtime31.jsx)(Field, { label: "\u4F1A\u793E\u540D", children: /* @__PURE__ */ (0, import_jsx_runtime31.jsx)(Input, { required: true, maxLength: 300, value: modal.name, onChange: (e) => setModal({ ...modal, name: e.target.value }) }) }),
           modal.type === "settings" && /* @__PURE__ */ (0, import_jsx_runtime31.jsx)(Field, { label: "\u6CD5\u4EBA\u756A\u53F7\uFF08\u4EFB\u610F\uFF09", children: /* @__PURE__ */ (0, import_jsx_runtime31.jsx)(Input, { value: modal.corporate_number, onChange: (e) => setModal({ ...modal, corporate_number: e.target.value }) }) }),
-          (modal.type === "create" || modal.type === "year") && /* @__PURE__ */ (0, import_jsx_runtime31.jsxs)(import_jsx_runtime31.Fragment, { children: [
+          (modal.type === "create" || modal.type === "year") && /* @__PURE__ */ (0, import_jsx_runtime31.jsxs)(import_react8.Fragment, { children: [
             /* @__PURE__ */ (0, import_jsx_runtime31.jsx)(Field, { label: "\u5E74\u5EA6\u958B\u59CB\u65E5", children: /* @__PURE__ */ (0, import_jsx_runtime31.jsx)(Input, { required: true, type: "date", value: modal.start, onChange: (e) => setModal({ ...modal, start: e.target.value }) }) }),
             /* @__PURE__ */ (0, import_jsx_runtime31.jsx)(Field, { label: "\u5E74\u5EA6\u7D42\u4E86\u65E5", children: /* @__PURE__ */ (0, import_jsx_runtime31.jsx)(Input, { required: true, type: "date", value: modal.end, onChange: (e) => setModal({ ...modal, end: e.target.value }) }) })
           ] }),
-          modal.type === "account" && /* @__PURE__ */ (0, import_jsx_runtime31.jsxs)(import_jsx_runtime31.Fragment, { children: [
+          modal.type === "account" && /* @__PURE__ */ (0, import_jsx_runtime31.jsxs)(import_react8.Fragment, { children: [
             /* @__PURE__ */ (0, import_jsx_runtime31.jsx)(Field, { label: "\u52D8\u5B9A\u79D1\u76EE\u30B3\u30FC\u30C9", children: /* @__PURE__ */ (0, import_jsx_runtime31.jsx)(Input, { required: true, value: modal.account_code, onChange: (e) => setModal({ ...modal, account_code: e.target.value }) }) }),
             /* @__PURE__ */ (0, import_jsx_runtime31.jsx)(Field, { label: "\u52D8\u5B9A\u79D1\u76EE\u540D", children: /* @__PURE__ */ (0, import_jsx_runtime31.jsx)(Input, { required: true, value: modal.account_name, onChange: (e) => setModal({ ...modal, account_name: e.target.value }) }) }),
             /* @__PURE__ */ (0, import_jsx_runtime31.jsx)(Field, { label: "\u30C7\u30D5\u30A9\u30EB\u30C8\u7A0E\u533A\u5206", children: /* @__PURE__ */ (0, import_jsx_runtime31.jsx)(Choice, { value: modal.default_tax_code || "UNSPECIFIED", onChange: (v) => setModal({ ...modal, default_tax_code: v }), options: [["UNSPECIFIED", "\u7A0E\u60C5\u5831\u672A\u8A2D\u5B9A"], ...orderedTaxCodes(s).map((t) => [t.tax_code, t.tax_name + (t.active ? "" : "\uFF08\u7121\u52B9\uFF09")])] }) }),
+            (0, import_jsx_runtime31.jsx)(Field,{label:"補助科目入力設定",children:(0, import_jsx_runtime31.jsx)(Choice,{value:modal.subaccount_input||"OPTIONAL",onChange:v=>setModal({...modal,subaccount_input:v}),options:Object.entries(inputModes)})}),
+            (0, import_jsx_runtime31.jsx)(Field,{label:"相手勘定科目への補助科目入力支援",children:(0, import_jsx_runtime31.jsx)(Choice,{value:modal.subaccount_assist||"NONE",onChange:v=>setModal({...modal,subaccount_assist:v}),options:Object.entries(assistModes)})}),
             /* @__PURE__ */ (0, import_jsx_runtime31.jsx)(Field, { label: "\u8CA1\u52D9\u8AF8\u8868\u533A\u5206", children: /* @__PURE__ */ (0, import_jsx_runtime31.jsx)(Choice, { value: modal.section, onChange: (v) => setModal({ ...modal, section: v, normal_balance: ["ASSET", "EXPENSE"].includes(sectionTypes[v]) ? "DEBIT" : "CREDIT" }), options: Object.entries(sections) }) }),
             /* @__PURE__ */ (0, import_jsx_runtime31.jsx)(Field, { label: "\u901A\u5E38\u6B8B\u9AD8", children: /* @__PURE__ */ (0, import_jsx_runtime31.jsx)(Choice, { value: modal.normal_balance || (["ASSET", "EXPENSE"].includes(sectionTypes[modal.section]) ? "DEBIT" : "CREDIT"), onChange: (v) => setModal({ ...modal, normal_balance: v }), options: [["DEBIT", "\u501F\u65B9"], ["CREDIT", "\u8CB8\u65B9"]] }) }),
             /* @__PURE__ */ (0, import_jsx_runtime31.jsx)(Field, { label: "\u30C0\u30C3\u30B7\u30E5\u30DC\u30FC\u30C9\u96C6\u8A08\u533A\u5206", children: /* @__PURE__ */ (0, import_jsx_runtime31.jsx)(Choice, { value: modal.tag, onChange: (v) => setModal({ ...modal, tag: v }), options: [["", "\u6307\u5B9A\u306A\u3057"], ["CASH", "\u73FE\u9810\u91D1"], ["AR", "\u58F2\u639B\u91D1"], ["AP", "\u8CB7\u639B\u91D1\u30FB\u672A\u6255\u91D1"], ["RETAINED", "\u7E70\u8D8A\u5229\u76CA\u5270\u4F59\u91D1"]] }) })
           ] }),
-          modal.type === "subaccount" && /* @__PURE__ */ (0, import_jsx_runtime31.jsxs)(import_jsx_runtime31.Fragment, { children: [
+          modal.type === "subaccount" && /* @__PURE__ */ (0, import_jsx_runtime31.jsxs)(import_react8.Fragment, { children: [
             /* @__PURE__ */ (0, import_jsx_runtime31.jsx)(Field, { label: "\u89AA\u79D1\u76EE", children: /* @__PURE__ */ (0, import_jsx_runtime31.jsx)(Choice, { value: modal.account_id, onChange: (v) => setModal({ ...modal, account_id: v }), options: [["", "\u79D1\u76EE\u3092\u9078\u629E"], ...s.accounts.filter((a) => a.active).map((a) => [a.id, a.account_name])] }) }),
             /* @__PURE__ */ (0, import_jsx_runtime31.jsx)(Field, { label: "\u88DC\u52A9\u79D1\u76EE\u540D", children: /* @__PURE__ */ (0, import_jsx_runtime31.jsx)(Input, { required: true, value: modal.name, onChange: (e) => setModal({ ...modal, name: e.target.value }) }) })
           ] }),
@@ -26286,7 +26362,7 @@ function AccountingApp() {
         /* @__PURE__ */ (0, import_jsx_runtime31.jsx)(DialogTitle3, { children: detail?.audit ? "\u76E3\u67FB\u30ED\u30B0\u8A73\u7D30" : `\u4ED5\u8A33 ${detail?.journal_number}` }),
         /* @__PURE__ */ (0, import_jsx_runtime31.jsx)(DialogDescription3, { children: detail?.audit ? detail.event_type : detail?.description })
       ] }),
-      detail && (detail.audit ? /* @__PURE__ */ (0, import_jsx_runtime31.jsx)("pre", { children: JSON.stringify(detail, null, 2) }) : /* @__PURE__ */ (0, import_jsx_runtime31.jsxs)(import_jsx_runtime31.Fragment, { children: [
+      detail && (detail.audit ? /* @__PURE__ */ (0, import_jsx_runtime31.jsx)("pre", { children: JSON.stringify(detail, null, 2) }) : /* @__PURE__ */ (0, import_jsx_runtime31.jsxs)(import_react8.Fragment, { children: [
         /* @__PURE__ */ (0, import_jsx_runtime31.jsxs)("p", { children: [
           detail.transaction_date,
           " / ",
@@ -26302,7 +26378,7 @@ function AccountingApp() {
           " / ",
           detail.deleted_by
         ] }),
-        /* @__PURE__ */ (0, import_jsx_runtime31.jsx)(GridTable, { heads: ["\u79D1\u76EE", "\u88DC\u52A9\u79D1\u76EE", "\u501F\u65B9", "\u8CB8\u65B9", "\u660E\u7D30\u6458\u8981"], rows: currentLines(s, detail).map((l) => [accountName(l.account_id), subName(l.subaccount_id), money2(l.debit_amount), money2(l.credit_amount), l.line_description]) }),
+        /* @__PURE__ */ (0, import_jsx_runtime31.jsx)(GridTable, { heads: ["\u79D1\u76EE", "\u88DC\u52A9\u79D1\u76EE", "\u501F\u65B9", "\u8CB8\u65B9", "\u660E\u7D30\u6458\u8981"], rows: currentLines(s, detail).map((l) => [accountName(l.account_id), subaccountName(s,l), money2(l.debit_amount), money2(l.credit_amount), l.line_description]) }),
         /* @__PURE__ */ (0, import_jsx_runtime31.jsx)(TaxDetails, { lines: currentLines(s, detail) }),
         /* @__PURE__ */ (0, import_jsx_runtime31.jsxs)("p", { className: "muted", children: [
           "\u660E\u7D30\u7248\uFF1A",

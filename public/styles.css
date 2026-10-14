@@ -6932,3 +6932,17 @@ summary {
     }
   }
 }
+/* Free-text auxiliary names share the existing journal and report layout. */
+.subaccount-combo{position:relative;min-width:180px;margin-top:6px}
+.subaccount-text{width:100%;padding:8px;border:1px solid #cbd5e1;border-radius:6px;background:white;color:#162b49}
+.subaccount-options{position:absolute;z-index:30;top:100%;left:0;min-width:260px;max-height:240px;overflow:auto;background:white;border:1px solid #cbd5e1;border-radius:6px;box-shadow:0 4px 10px #0002}
+.subaccount-options button{display:block;text-align:left;width:100%;padding:8px;cursor:pointer}
+.subaccount-options button:hover,.subaccount-options button:focus{background:#edf4fb}
+.subaccount-options small{display:block;padding:6px}
+.subaccount-report{overflow-x:auto}
+.subaccount-report table{width:100%;min-width:620px;border:1px solid #e0e7ef;border-radius:5px}
+.subaccount-report th{padding:12px;text-align:left;background:#f3f6fa;color:#516780;font-size:14px}
+.subaccount-report td{padding:13px 12px;border-bottom:1px solid #e5ebf2;font-size:14px;font-variant-numeric:tabular-nums}
+.subaccount-report button{padding:6px 12px;margin:4px;border:1px solid #cbd5e1;border-radius:5px;color:#183d65;cursor:pointer}
+.subaccount-report button:disabled{opacity:.45;cursor:default}
+.subaccount-report .filters select,.subaccount-report .filters input:not([type=checkbox]){padding:8px;border:1px solid #cbd5e1;border-radius:5px;background:white}

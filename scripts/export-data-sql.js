@@ -27,7 +27,7 @@ try{
  await db.connect();tx=new sql.Transaction(db);await tx.begin(sql.ISOLATION_LEVEL.SERIALIZABLE);begun=true;
  const request=()=>new sql.Request(tx);
  const identity=(await request().query("SELECT CONVERT(nvarchar(128),SERVERPROPERTY('InstanceName')) AS instance_name, DB_NAME() AS database_name")).recordset[0];
- const actual=(await request().query("SELECT t.name AS table_name,c.name AS column_name FROM sys.tables t JOIN sys.schemas s ON s.schema_id=t.schema_id JOIN sys.columns c ON c.object_id=t.object_id WHERE s.name='dbo'")).recordset;
+ const actual=(await request().query("SELECT t.name AS table_name,c.name AS column_name FROM sys.tables t JOIN sys.schemas s ON s.schema_id=t.schema_id JOIN sys.columns c ON c.object_id=t.object_id WHERE s.name='dbo' AND c.is_computed=0")).recordset;
  assert.deepEqual([...new Set(actual.map(r=>r.table_name))].sort(),[...physicalTables].sort(),'Unexpected table set; refusing incomplete export');
  const snapshot={};
  for(const table of order){

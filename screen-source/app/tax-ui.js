@@ -1,6 +1,8 @@
 "use client";
 import { Fragment, jsx, jsxs } from "react/jsx-runtime";
 import { useState } from "react";
+import {SubaccountInput} from "./subaccount-ui.js";
+import {subaccountName} from "../lib/accounting/subaccounts.js";
 import { currentLines, orderedTaxCodes } from "@/lib/accounting/core";
 import { expandTaxLines, calculateTax, taxReport, taxTypes, roundingNames } from "@/lib/accounting/tax";
 import { Button } from "@/components/ui/button";
@@ -26,7 +28,7 @@ function editorLines(s, j) {
   return currentLines(s, j).filter((l) => !l.is_tax_line).map((l) => {
     const side = l.entry_side || (l.debit_amount ? "DEBIT" : "CREDIT");
     const n = l.input_amount ?? (l.debit_amount || l.credit_amount);
-    return { ...l, original_line_id: l.id, debit_amount: side === "DEBIT" ? n : 0, credit_amount: side === "CREDIT" ? n : 0, amount_input_type: l.amount_input_type || "NET", tax_override: l.tax_status === "SET" && l.tax_amount !== l.calculated_tax_amount ? String(l.tax_amount) : "", tax_adjustment_reason: l.tax_adjustment_reason || "" };
+    return { ...l, subaccount_name: subaccountName(s,l), original_line_id: l.id, debit_amount: side === "DEBIT" ? n : 0, credit_amount: side === "CREDIT" ? n : 0, amount_input_type: l.amount_input_type || "NET", tax_override: l.tax_status === "SET" && l.tax_amount !== l.calculated_tax_amount ? String(l.tax_amount) : "", tax_adjustment_reason: l.tax_adjustment_reason || "" };
   });
 }
 function TaxLineEditor({ s, editor, setEditor }) {
@@ -63,8 +65,8 @@ function TaxLineEditor({ s, editor, setEditor }) {
         }
         return /* @__PURE__ */ jsxs(TableRow, { children: [
           /* @__PURE__ */ jsxs(TableCell, { children: [
-            /* @__PURE__ */ jsx(Choose, { label: "\u52D8\u5B9A\u79D1\u76EE", value: l.account_id, options: [["", "\u79D1\u76EE\u3092\u9078\u629E"], ...s.accounts.filter((a) => a.active).map((a) => [a.id, a.account_name])], onChange: (v) => update({ account_id: v, subaccount_id: "", tax_code: s.accounts.find((a) => a.id === v)?.default_tax_code || "UNSPECIFIED", tax_override: "", tax_adjustment_reason: "" }) }),
-            /* @__PURE__ */ jsx(Choose, { label: "\u88DC\u52A9\u79D1\u76EE", value: l.subaccount_id, options: [["", "\u6307\u5B9A\u306A\u3057"], ...s.subaccounts.filter((a) => a.active && a.account_id === l.account_id).map((a) => [a.id, a.name])], onChange: (v) => update({ subaccount_id: v }) })
+            /* @__PURE__ */ jsx(Choose, { label: "\u52D8\u5B9A\u79D1\u76EE", value: l.account_id, options: [["", "\u79D1\u76EE\u3092\u9078\u629E"], ...s.accounts.filter((a) => a.active).map((a) => [a.id, a.account_name])], onChange: (v) => update({ account_id: v, subaccount_id: "", subaccount_name: "", subaccount_search: "", tax_code: s.accounts.find((a) => a.id === v)?.default_tax_code || "UNSPECIFIED", tax_override: "", tax_adjustment_reason: "" }) }),
+            jsx(SubaccountInput, { s, editor, line: l, inputId:i, onChange:update })
           ] }),
           /* @__PURE__ */ jsx(TableCell, { children: /* @__PURE__ */ jsx(Choose, { label: "\u501F\u8CB8", value: side, options: [["DEBIT", "\u501F\u65B9"], ["CREDIT", "\u8CB8\u65B9"]], onChange: (v) => update({ entry_side: v, debit_amount: v === "DEBIT" ? value : 0, credit_amount: v === "CREDIT" ? value : 0 }) }) }),
           /* @__PURE__ */ jsx(TableCell, { children: /* @__PURE__ */ jsx(Choose, { label: "\u5165\u529B\u65B9\u5F0F", value: l.amount_input_type || "NET", options: [["NET", "\u7A0E\u629C"], ["GROSS", "\u7A0E\u8FBC"]], onChange: (v) => update({ amount_input_type: v }) }) }),

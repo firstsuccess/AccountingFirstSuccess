@@ -1,5 +1,5 @@
-import { assert, currentLines, mutate } from "./core";
-import { rateBps, yen } from "./tax";
+import { assert, currentLines, mutate } from "./core.js";
+import { rateBps, yen } from "./tax.js";
 function parseJournalCSV(text) {
   assert(typeof text === "string" && text.length <= 5e5, "CSV\u306F500KB\u4EE5\u5185\u3067\u3059");
   const records = [];
@@ -66,12 +66,7 @@ function inputLine(s, r) {
   const a = s.accounts.find((a2) => a2.account_code === r.account_code);
   assert(a?.active, `\u6709\u52B9\u306A\u52D8\u5B9A\u79D1\u76EE\u304C\u3042\u308A\u307E\u305B\u3093\uFF1A${r.account_code}`);
   let sub = r.subaccount_id ? s.subaccounts.find((x) => x.id === r.subaccount_id) : void 0;
-  if (!r.subaccount_id && r.subaccount_name) {
-    const matches = s.subaccounts.filter((x) => x.name === r.subaccount_name && x.account_id === a.id);
-    assert(matches.length === 1, "\u88DC\u52A9\u79D1\u76EE\u540D\u3092\u4E00\u610F\u306B\u7279\u5B9A\u3067\u304D\u307E\u305B\u3093");
-    sub = matches[0];
-  }
-  assert(!(r.subaccount_id || r.subaccount_name) || sub?.active && sub.account_id === a.id && (!r.subaccount_name || sub.name === r.subaccount_name), "\u88DC\u52A9\u79D1\u76EE\u306E\u6240\u5C5E\u30FB\u540D\u79F0\u30FB\u6709\u52B9\u72B6\u614B\u304C\u4E0D\u6B63\u3067\u3059");
+  assert(!r.subaccount_id || sub?.active && sub.account_id === a.id, "補助科目IDの所属・有効状態が不正です");
   const d = integer(r.debit_amount || "0", "\u501F\u65B9\u91D1\u984D"), c = integer(r.credit_amount || "0", "\u8CB8\u65B9\u91D1\u984D");
   assert(!(d && c), "\u501F\u65B9\u30FB\u8CB8\u65B9\u306E\u4E21\u5074\u306B\u91D1\u984D\u304C\u3042\u308A\u307E\u3059");
   const side = r.entry_side || (d ? "DEBIT" : c ? "CREDIT" : "");
@@ -87,7 +82,7 @@ function inputLine(s, r) {
     assert(BigInt(integer(r.taxable_amount, "\u7A0E\u629C\u91D1\u984D")) + BigInt(integer(r.tax_amount, "\u7A0E\u984D")) === BigInt(integer(r.gross_amount, "\u7A0E\u8FBC\u91D1\u984D")), "\u7A0E\u8FBC\u91D1\u984D\u3068\u672C\u4F53\u91D1\u984D\uFF0B\u7A0E\u984D\u304C\u4E00\u81F4\u3057\u307E\u305B\u3093");
   }
   const adjusted = known && r.calculated_tax_amount !== void 0 && r.calculated_tax_amount !== "" && integer(r.calculated_tax_amount, "\u8A08\u7B97\u7A0E\u984D") !== integer(r.tax_amount, "\u7A0E\u984D");
-  return { account_id: a.id, subaccount_id: sub?.id || null, debit_amount: side === "DEBIT" ? input : 0, credit_amount: side === "CREDIT" ? input : 0, amount_input_type: r.amount_input_type || "NET", tax_code: code, line_description: r.line_description || "", original_line_id: r.line_id || void 0, tax_override: adjusted || known && r.tax_adjustment_reason ? r.tax_amount : "", tax_adjustment_reason: r.tax_adjustment_reason || "" };
+  return { account_id: a.id, subaccount_id: sub?.id || null, subaccount_name: r.subaccount_name ?? sub?.name ?? "", debit_amount: side === "DEBIT" ? input : 0, credit_amount: side === "CREDIT" ? input : 0, amount_input_type: r.amount_input_type || "NET", tax_code: code, line_description: r.line_description || "", original_line_id: r.line_id || void 0, tax_override: adjusted || known && r.tax_adjustment_reason ? r.tax_amount : "", tax_adjustment_reason: r.tax_adjustment_reason || "" };
 }
 function prepareImport(before, text, user, reason, filename) {
   assert(before.company.owner === user, "\u4F1A\u793E\u3078\u306E\u30A2\u30AF\u30BB\u30B9\u6A29\u304C\u3042\u308A\u307E\u305B\u3093");
