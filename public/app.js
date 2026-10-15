@@ -26148,7 +26148,7 @@ function AccountingApp() {
                 /* @__PURE__ */ (0, import_jsx_runtime31.jsx)(Checkbox3, { checked: filters.deleted, onCheckedChange: (v) => setFilters({ ...filters, deleted: v === true }) }),
                 "\u524A\u9664\u6E08\u307F\u3092\u8868\u793A"
               ] }),
-              /* @__PURE__ */ (0, import_jsx_runtime31.jsxs)(Button, { variant: "outline", onClick: () => download(csv(filtered.flatMap((j) => currentLines(s, j).map((l) => ({ ...j, ...l, line_id: l.id, journal_id: j.id })))), "journal-view.csv"), children: [
+              /* @__PURE__ */ (0, import_jsx_runtime31.jsxs)(Button, { variant: "outline", onClick: () => download(csv(filtered.flatMap((j) => currentLines(s, j).map((l) => Object.fromEntries(Object.entries({ ...j, ...l, line_id: l.id, journal_id: j.id }).flatMap(([key,value]) => key === "account_id" ? [[key,value],["account_name",accountName(value)]] : [[key,value]]))))), "journal-view.csv"), children: [
                 /* @__PURE__ */ (0, import_jsx_runtime31.jsx)(Download, { size: 15 }),
                 "\u8868\u793A\u7D50\u679CCSV"
               ] })
