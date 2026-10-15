@@ -56,6 +56,15 @@ function TaxLineEditor({ s, editor, setEditor }) {
           ls[i] = { ...l, ...p };
           setEditor({ ...editor, lines: ls });
         }
+        function fillCounterAmount() {
+          if (editor.lines.length !== 2 || !value || Number(value) <= 0) return;
+          const other = editor.lines[1-i];
+          const otherSide = other.entry_side || (other.credit_amount ? "CREDIT" : "DEBIT");
+          if (other.debit_amount || other.credit_amount) return;
+          const ls = [...editor.lines];
+          ls[1-i] = {...other, debit_amount:otherSide === "DEBIT" ? value : 0, credit_amount:otherSide === "CREDIT" ? value : 0};
+          setEditor({...editor,lines:ls});
+        }
         let calc = preview.filter((x) => !x.is_tax_line)[i];
         if (!calc) {
           try {
@@ -65,7 +74,7 @@ function TaxLineEditor({ s, editor, setEditor }) {
         }
         return /* @__PURE__ */ jsxs(TableRow, { children: [
           /* @__PURE__ */ jsxs(TableCell, { children: [
-            /* @__PURE__ */ jsx(Choose, { label: "\u52D8\u5B9A\u79D1\u76EE", value: l.account_id, options: [["", "\u79D1\u76EE\u3092\u9078\u629E"], ...s.accounts.filter((a) => a.active).map((a) => [a.id, a.account_name])], onChange: (v) => update({ account_id: v, subaccount_id: "", subaccount_name: "", subaccount_search: "", tax_code: s.accounts.find((a) => a.id === v)?.default_tax_code || "UNSPECIFIED", tax_override: "", tax_adjustment_reason: "" }) }),
+            /* @__PURE__ */ jsx(Choose, { label: "\u52D8\u5B9A\u79D1\u76EE", value: l.account_id, options: [["", "\u79D1\u76EE\u3092\u9078\u629E"], ...s.accounts.filter((a) => a.active).sort((a,b) => a.account_code.localeCompare(b.account_code, "ja", {numeric:true})).map((a) => [a.id, a.account_name])], onChange: (v) => update({ account_id: v, subaccount_id: "", subaccount_name: "", subaccount_search: "", tax_code: s.accounts.find((a) => a.id === v)?.default_tax_code || "UNSPECIFIED", tax_override: "", tax_adjustment_reason: "" }) }),
             jsx(SubaccountInput, { s, editor, line: l, inputId:i, onChange:update })
           ] }),
           /* @__PURE__ */ jsx(TableCell, { children: /* @__PURE__ */ jsx(Choose, { label: "\u501F\u8CB8", value: side, options: [["DEBIT", "\u501F\u65B9"], ["CREDIT", "\u8CB8\u65B9"]], onChange: (v) => update({ entry_side: v, debit_amount: v === "DEBIT" ? value : 0, credit_amount: v === "CREDIT" ? value : 0 }) }) }),
@@ -74,7 +83,7 @@ function TaxLineEditor({ s, editor, setEditor }) {
             /* @__PURE__ */ jsx(Choose, { label: "\u7A0E\u533A\u5206", value: l.tax_code || "UNSPECIFIED", options: [["UNSPECIFIED", "\u7A0E\u60C5\u5831\u672A\u8A2D\u5B9A"], ...orderedTaxCodes(s).filter((t) => t.active || t.tax_code === l.tax_code).map((t) => [t.tax_code, t.tax_name + (t.active ? "" : "\uFF08\u7121\u52B9\uFF09")])], onChange: (v) => update({ tax_code: v, tax_override: "", tax_adjustment_reason: "" }) }),
             /* @__PURE__ */ jsx("small", { children: calc?.tax_rate != null ? `${calc.tax_rate}%\uFF08\u4FDD\u5B58\u6642\u70B9\uFF09` : "\u7A0E\u7387\u672A\u8A2D\u5B9A" })
           ] }),
-          /* @__PURE__ */ jsx(TableCell, { children: /* @__PURE__ */ jsx(Input, { "aria-label": `${i + 1}\u884C\u76EE\u306E\u5165\u529B\u91D1\u984D`, type: "number", min: "1", step: "1", value: value || "", onChange: (e) => update({ debit_amount: side === "DEBIT" ? e.target.value : 0, credit_amount: side === "CREDIT" ? e.target.value : 0 }) }) }),
+          /* @__PURE__ */ jsx(TableCell, { children: /* @__PURE__ */ jsx(Input, { "aria-label": `${i + 1}\u884C\u76EE\u306E\u5165\u529B\u91D1\u984D`, type: "number", min: "1", step: "1", value: value || "", onBlur: fillCounterAmount, onChange: (e) => update({ debit_amount: side === "DEBIT" ? e.target.value : 0, credit_amount: side === "CREDIT" ? e.target.value : 0 }) }) }),
           /* @__PURE__ */ jsx(TableCell, { children: calc?.tax_status === "SET" ? /* @__PURE__ */ jsxs("div", { className: "tax-breakdown", children: [
             "\u7A0E\u8FBC ",
             money(calc.gross_amount),

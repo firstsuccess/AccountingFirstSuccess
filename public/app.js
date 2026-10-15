@@ -24830,6 +24830,15 @@ function TaxLineEditor({ s, editor, setEditor }) {
           ls[i] = { ...l, ...p };
           setEditor({ ...editor, lines: ls });
         }
+        function fillCounterAmount() {
+          if (editor.lines.length !== 2 || !value || Number(value) <= 0) return;
+          const other = editor.lines[1-i];
+          const otherSide = other.entry_side || (other.credit_amount ? "CREDIT" : "DEBIT");
+          if (other.debit_amount || other.credit_amount) return;
+          const ls = [...editor.lines];
+          ls[1-i] = {...other, debit_amount:otherSide === "DEBIT" ? value : 0, credit_amount:otherSide === "CREDIT" ? value : 0};
+          setEditor({...editor,lines:ls});
+        }
         let calc = preview.filter((x) => !x.is_tax_line)[i];
         if (!calc) {
           try {
@@ -24839,7 +24848,7 @@ function TaxLineEditor({ s, editor, setEditor }) {
         }
         return /* @__PURE__ */ (0, import_jsx_runtime24.jsxs)(TableRow, { children: [
           /* @__PURE__ */ (0, import_jsx_runtime24.jsxs)(TableCell, { children: [
-            /* @__PURE__ */ (0, import_jsx_runtime24.jsx)(Choose, { label: "\u52D8\u5B9A\u79D1\u76EE", value: l.account_id, options: [["", "\u79D1\u76EE\u3092\u9078\u629E"], ...s.accounts.filter((a) => a.active).map((a) => [a.id, a.account_name])], onChange: (v) => update({ account_id: v, subaccount_id: "", subaccount_name: "", subaccount_search: "", tax_code: s.accounts.find((a) => a.id === v)?.default_tax_code || "UNSPECIFIED", tax_override: "", tax_adjustment_reason: "" }) }),
+            /* @__PURE__ */ (0, import_jsx_runtime24.jsx)(Choose, { label: "\u52D8\u5B9A\u79D1\u76EE", value: l.account_id, options: [["", "\u79D1\u76EE\u3092\u9078\u629E"], ...s.accounts.filter((a) => a.active).sort((a,b) => a.account_code.localeCompare(b.account_code, "ja", {numeric:true})).map((a) => [a.id, a.account_name])], onChange: (v) => update({ account_id: v, subaccount_id: "", subaccount_name: "", subaccount_search: "", tax_code: s.accounts.find((a) => a.id === v)?.default_tax_code || "UNSPECIFIED", tax_override: "", tax_adjustment_reason: "" }) }),
             (0, import_jsx_runtime24.jsx)(SubaccountInput, { s, editor, line: l, inputId:i, onChange:update })
           ] }),
           /* @__PURE__ */ (0, import_jsx_runtime24.jsx)(TableCell, { children: /* @__PURE__ */ (0, import_jsx_runtime24.jsx)(Choose, { label: "\u501F\u8CB8", value: side, options: [["DEBIT", "\u501F\u65B9"], ["CREDIT", "\u8CB8\u65B9"]], onChange: (v) => update({ entry_side: v, debit_amount: v === "DEBIT" ? value : 0, credit_amount: v === "CREDIT" ? value : 0 }) }) }),
@@ -24848,7 +24857,7 @@ function TaxLineEditor({ s, editor, setEditor }) {
             /* @__PURE__ */ (0, import_jsx_runtime24.jsx)(Choose, { label: "\u7A0E\u533A\u5206", value: l.tax_code || "UNSPECIFIED", options: [["UNSPECIFIED", "\u7A0E\u60C5\u5831\u672A\u8A2D\u5B9A"], ...orderedTaxCodes(s).filter((t) => t.active || t.tax_code === l.tax_code).map((t) => [t.tax_code, t.tax_name + (t.active ? "" : "\uFF08\u7121\u52B9\uFF09")])], onChange: (v) => update({ tax_code: v, tax_override: "", tax_adjustment_reason: "" }) }),
             /* @__PURE__ */ (0, import_jsx_runtime24.jsx)("small", { children: calc?.tax_rate != null ? `${calc.tax_rate}%\uFF08\u4FDD\u5B58\u6642\u70B9\uFF09` : "\u7A0E\u7387\u672A\u8A2D\u5B9A" })
           ] }),
-          /* @__PURE__ */ (0, import_jsx_runtime24.jsx)(TableCell, { children: /* @__PURE__ */ (0, import_jsx_runtime24.jsx)(Input, { "aria-label": `${i + 1}\u884C\u76EE\u306E\u5165\u529B\u91D1\u984D`, type: "number", min: "1", step: "1", value: value || "", onChange: (e) => update({ debit_amount: side === "DEBIT" ? e.target.value : 0, credit_amount: side === "CREDIT" ? e.target.value : 0 }) }) }),
+          /* @__PURE__ */ (0, import_jsx_runtime24.jsx)(TableCell, { children: /* @__PURE__ */ (0, import_jsx_runtime24.jsx)(Input, { "aria-label": `${i + 1}\u884C\u76EE\u306E\u5165\u529B\u91D1\u984D`, type: "number", min: "1", step: "1", value: value || "", onBlur: fillCounterAmount, onChange: (e) => update({ debit_amount: side === "DEBIT" ? e.target.value : 0, credit_amount: side === "CREDIT" ? e.target.value : 0 }) }) }),
           /* @__PURE__ */ (0, import_jsx_runtime24.jsx)(TableCell, { children: calc?.tax_status === "SET" ? /* @__PURE__ */ (0, import_jsx_runtime24.jsxs)("div", { className: "tax-breakdown", children: [
             "\u7A0E\u8FBC ",
             money(calc.gross_amount),
@@ -26114,7 +26123,6 @@ function AccountingApp() {
               /* @__PURE__ */ (0, import_jsx_runtime31.jsxs)("div", { className: "formgrid", children: [
                 /* @__PURE__ */ (0, import_jsx_runtime31.jsx)(Field, { label: "\u53D6\u5F15\u65E5", children: /* @__PURE__ */ (0, import_jsx_runtime31.jsx)(Input, { type: "date", required: true, value: editor.transaction_date, onChange: (e) => setEditor({ ...editor, transaction_date: e.target.value }) }) }),
                 /* @__PURE__ */ (0, import_jsx_runtime31.jsx)(Field, { label: "\u6458\u8981", children: /* @__PURE__ */ (0, import_jsx_runtime31.jsx)(Input, { required: true, maxLength: 300, value: editor.description, onChange: (e) => setEditor({ ...editor, description: e.target.value }) }) }),
-                /* @__PURE__ */ (0, import_jsx_runtime31.jsx)(Field, { label: "\u53D6\u5F15\u5148", children: /* @__PURE__ */ (0, import_jsx_runtime31.jsx)(Input, { maxLength: 300, value: editor.counterparty, onChange: (e) => setEditor({ ...editor, counterparty: e.target.value }) }) })
               ] }),
               /* @__PURE__ */ (0, import_jsx_runtime31.jsx)(TaxLineEditor, { s, editor, setEditor }),
               editor.id && /* @__PURE__ */ (0, import_jsx_runtime31.jsx)(Field, { label: "\u5909\u66F4\u7406\u7531\uFF08\u5FC5\u9808\uFF09", children: /* @__PURE__ */ (0, import_jsx_runtime31.jsx)(Input, { required: true, value: editor.reason, onChange: (e) => setEditor({ ...editor, reason: e.target.value }) }) }),
@@ -26131,7 +26139,7 @@ function AccountingApp() {
           page === "\u4ED5\u8A33\u5E33" && /* @__PURE__ */ (0, import_jsx_runtime31.jsxs)("section", { className: "panel", children: [
             /* @__PURE__ */ (0, import_jsx_runtime31.jsxs)("div", { className: "filters", children: [
               [["number", "\u4ED5\u8A33\u756A\u53F7"], ["description", "\u6458\u8981"], ["counterparty", "\u53D6\u5F15\u5148"], ["min", "\u6700\u5C0F\u91D1\u984D"], ["max", "\u6700\u5927\u91D1\u984D"]].map(([key, label]) => /* @__PURE__ */ (0, import_jsx_runtime31.jsx)(Field, { label, children: /* @__PURE__ */ (0, import_jsx_runtime31.jsx)(Input, { value: filters[key], inputMode: key === "min" || key === "max" ? "numeric" : void 0, onChange: (e) => setFilters({ ...filters, [key]: key === "min" || key === "max" ? e.target.value.replace(/\D/g, "") : e.target.value }) }) }, key)),
-              /* @__PURE__ */ (0, import_jsx_runtime31.jsx)(Field, { label: "\u52D8\u5B9A\u79D1\u76EE", children: /* @__PURE__ */ (0, import_jsx_runtime31.jsx)(Choice, { value: filters.account, onChange: (v) => setFilters({ ...filters, account: v, sub: "" }), options: [["", "\u3059\u3079\u3066"], ...s.accounts.map((a) => [a.id, a.account_name])] }) }),
+              /* @__PURE__ */ (0, import_jsx_runtime31.jsx)(Field, { label: "\u52D8\u5B9A\u79D1\u76EE", children: /* @__PURE__ */ (0, import_jsx_runtime31.jsx)(Choice, { value: filters.account, onChange: (v) => setFilters({ ...filters, account: v, sub: "" }), options: [["", "\u3059\u3079\u3066"], ...[...s.accounts].sort((a,b)=>a.account_code.localeCompare(b.account_code,"ja",{numeric:true})).map((a) => [a.id, a.account_name])] }) }),
               /* @__PURE__ */ (0, import_jsx_runtime31.jsx)(Field, { label: "\u88DC\u52A9\u79D1\u76EE", children: /* @__PURE__ */ (0, import_jsx_runtime31.jsx)(Choice, { value: filters.sub, onChange: (v) => setFilters({ ...filters, sub: v }), options: [["", "\u3059\u3079\u3066"], ...s.subaccounts.filter((a) => !filters.account || a.account_id === filters.account).map((a) => [a.id, a.name])] }) }),
               (0, import_jsx_runtime31.jsx)(Field,{label:"補助科目名検索",children:(0, import_jsx_runtime31.jsx)(Input,{value:filters.subname||"",onChange:e=>setFilters({...filters,subname:e.target.value})})})
             ] }),
@@ -26146,7 +26154,7 @@ function AccountingApp() {
               ] })
             ] }),
             /* @__PURE__ */ (0, import_jsx_runtime31.jsx)(GridTable, { heads: ["\u65E5\u4ED8 / \u4ED5\u8A33\u756A\u53F7", "\u6458\u8981 / \u53D6\u5F15\u5148", "\u501F\u65B9\u79D1\u76EE", "\u8CB8\u65B9\u79D1\u76EE", "\u91D1\u984D\uFF08\u5186\uFF09", "\u72B6\u614B", "\u64CD\u4F5C"], rows: filtered.map((j) => {
-              const ls = currentLines(s, j);
+              const ls = currentLines(s, j).slice().sort((a,b)=>(s.accounts.find(x=>x.id===a.account_id)?.account_code||"").localeCompare(s.accounts.find(x=>x.id===b.account_id)?.account_code||"","ja",{numeric:true}));
               return [/* @__PURE__ */ (0, import_jsx_runtime31.jsxs)("div", { className: j.status === "DELETED" ? "deleted" : "", children: [
                 j.transaction_date,
                 /* @__PURE__ */ (0, import_jsx_runtime31.jsx)("br", {}),
@@ -26166,7 +26174,7 @@ function AccountingApp() {
           page === "補助元帳・残高" && (0, import_jsx_runtime31.jsx)(SubaccountWorkspace,{s,start,end},s.company.id),
           page === "\u7DCF\u52D8\u5B9A\u5143\u5E33" && report && /* @__PURE__ */ (0, import_jsx_runtime31.jsxs)("section", { className: "panel", children: [
             /* @__PURE__ */ (0, import_jsx_runtime31.jsxs)("div", { className: "section-title", children: [
-              /* @__PURE__ */ (0, import_jsx_runtime31.jsx)(Choice, { value: ledgerId, onChange: setLedgerId, options: s.accounts.map((a) => [a.id, `${a.account_code} ${a.account_name}`]) }),
+              /* @__PURE__ */ (0, import_jsx_runtime31.jsx)(Choice, { value: ledgerId, onChange: setLedgerId, options: [...s.accounts].sort((a,b)=>a.account_code.localeCompare(b.account_code,"ja",{numeric:true})).map((a) => [a.id, `${a.account_code} ${a.account_name}`]) }),
               /* @__PURE__ */ (0, import_jsx_runtime31.jsx)("span", { className: "muted", children: "\u6B8B\u9AD8\u306F\u501F\u65B9\u3092\u6B63\u3001\u8CB8\u65B9\u3092\u8CA0\u3068\u3057\u3066\u8868\u793A" })
             ] }),
             (() => {
@@ -26190,7 +26198,7 @@ function AccountingApp() {
           page === "\u8A66\u7B97\u8868" && report && /* @__PURE__ */ (0, import_jsx_runtime31.jsxs)("section", { className: "panel", children: [
             /* @__PURE__ */ (0, import_jsx_runtime31.jsx)(Check2, { ok: Object.values(report.trial).every((v) => v === "0"), label: "\u671F\u9996\u30FB\u767A\u751F\u984D\u30FB\u671F\u672B\u306E\u8CB8\u501F" }),
             /* @__PURE__ */ (0, import_jsx_runtime31.jsx)("p", { className: "muted", children: "\u671F\u9996\u30FB\u671F\u672B\u6B8B\u9AD8\u306F\u501F\u65B9\u3092\u6B63\u3001\u8CB8\u65B9\u3092\u8CA0\u3068\u3057\u3066\u8868\u793A\uFF08\u5186\uFF09" }),
-            /* @__PURE__ */ (0, import_jsx_runtime31.jsx)(GridTable, { heads: ["\u30B3\u30FC\u30C9", "\u52D8\u5B9A\u79D1\u76EE", "\u671F\u9996\u6B8B\u9AD8", "\u501F\u65B9\u767A\u751F\u984D", "\u8CB8\u65B9\u767A\u751F\u984D", "\u671F\u672B\u6B8B\u9AD8"], rows: [...report.rows.map((a) => [a.account_code, a.account_name, money2(a.opening), money2(a.debit), money2(a.credit), money2(a.closing)]), ["", "\u5408\u8A08", money2(report.trial.opening_difference), money2(report.rows.reduce((n, a) => n + BigInt(a.debit), 0n)), money2(report.rows.reduce((n, a) => n + BigInt(a.credit), 0n)), money2(report.trial.closing_difference)]] })
+            /* @__PURE__ */ (0, import_jsx_runtime31.jsx)(GridTable, { heads: ["\u30B3\u30FC\u30C9", "\u52D8\u5B9A\u79D1\u76EE", "\u671F\u9996\u6B8B\u9AD8", "\u501F\u65B9\u767A\u751F\u984D", "\u8CB8\u65B9\u767A\u751F\u984D", "\u671F\u672B\u6B8B\u9AD8"], rows: [...[...report.rows].sort((a,b)=>a.account_code.localeCompare(b.account_code,"ja",{numeric:true})).map((a) => [a.account_code, a.account_name, money2(a.opening), money2(a.debit), money2(a.credit), money2(a.closing)]), ["", "\u5408\u8A08", money2(report.trial.opening_difference), money2(report.rows.reduce((n, a) => n + BigInt(a.debit), 0n)), money2(report.rows.reduce((n, a) => n + BigInt(a.credit), 0n)), money2(report.trial.closing_difference)]] })
           ] }),
           page === "P/L" && report && /* @__PURE__ */ (0, import_jsx_runtime31.jsxs)("section", { className: "panel statement", children: [
             /* @__PURE__ */ (0, import_jsx_runtime31.jsx)("p", { className: "muted", children: "\u7A0E\u8A2D\u5B9A\u6E08\u307F\u53D6\u5F15\u306F\u7A0E\u629C\u3002\u7A0E\u60C5\u5831\u672A\u8A2D\u5B9A\u306E\u65E7\u53D6\u5F15\u306F\u5143\u306E\u91D1\u984D\u3067\u3059\u3002" }),

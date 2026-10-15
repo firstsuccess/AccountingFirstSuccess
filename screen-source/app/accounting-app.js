@@ -310,7 +310,6 @@ function AccountingApp() {
               /* @__PURE__ */ jsxs("div", { className: "formgrid", children: [
                 /* @__PURE__ */ jsx(Field, { label: "\u53D6\u5F15\u65E5", children: /* @__PURE__ */ jsx(Input, { type: "date", required: true, value: editor.transaction_date, onChange: (e) => setEditor({ ...editor, transaction_date: e.target.value }) }) }),
                 /* @__PURE__ */ jsx(Field, { label: "\u6458\u8981", children: /* @__PURE__ */ jsx(Input, { required: true, maxLength: 300, value: editor.description, onChange: (e) => setEditor({ ...editor, description: e.target.value }) }) }),
-                /* @__PURE__ */ jsx(Field, { label: "\u53D6\u5F15\u5148", children: /* @__PURE__ */ jsx(Input, { maxLength: 300, value: editor.counterparty, onChange: (e) => setEditor({ ...editor, counterparty: e.target.value }) }) })
               ] }),
               /* @__PURE__ */ jsx(TaxLineEditor, { s, editor, setEditor }),
               editor.id && /* @__PURE__ */ jsx(Field, { label: "\u5909\u66F4\u7406\u7531\uFF08\u5FC5\u9808\uFF09", children: /* @__PURE__ */ jsx(Input, { required: true, value: editor.reason, onChange: (e) => setEditor({ ...editor, reason: e.target.value }) }) }),
@@ -327,7 +326,7 @@ function AccountingApp() {
           page === "\u4ED5\u8A33\u5E33" && /* @__PURE__ */ jsxs("section", { className: "panel", children: [
             /* @__PURE__ */ jsxs("div", { className: "filters", children: [
               [["number", "\u4ED5\u8A33\u756A\u53F7"], ["description", "\u6458\u8981"], ["counterparty", "\u53D6\u5F15\u5148"], ["min", "\u6700\u5C0F\u91D1\u984D"], ["max", "\u6700\u5927\u91D1\u984D"]].map(([key, label]) => /* @__PURE__ */ jsx(Field, { label, children: /* @__PURE__ */ jsx(Input, { value: filters[key], inputMode: key === "min" || key === "max" ? "numeric" : void 0, onChange: (e) => setFilters({ ...filters, [key]: key === "min" || key === "max" ? e.target.value.replace(/\D/g, "") : e.target.value }) }) }, key)),
-              /* @__PURE__ */ jsx(Field, { label: "\u52D8\u5B9A\u79D1\u76EE", children: /* @__PURE__ */ jsx(Choice, { value: filters.account, onChange: (v) => setFilters({ ...filters, account: v, sub: "" }), options: [["", "\u3059\u3079\u3066"], ...s.accounts.map((a) => [a.id, a.account_name])] }) }),
+              /* @__PURE__ */ jsx(Field, { label: "\u52D8\u5B9A\u79D1\u76EE", children: /* @__PURE__ */ jsx(Choice, { value: filters.account, onChange: (v) => setFilters({ ...filters, account: v, sub: "" }), options: [["", "\u3059\u3079\u3066"], ...[...s.accounts].sort((a,b)=>a.account_code.localeCompare(b.account_code,"ja",{numeric:true})).map((a) => [a.id, a.account_name])] }) }),
               /* @__PURE__ */ jsx(Field, { label: "\u88DC\u52A9\u79D1\u76EE", children: /* @__PURE__ */ jsx(Choice, { value: filters.sub, onChange: (v) => setFilters({ ...filters, sub: v }), options: [["", "\u3059\u3079\u3066"], ...s.subaccounts.filter((a) => !filters.account || a.account_id === filters.account).map((a) => [a.id, a.name])] }) }),
               jsx(Field,{label:"補助科目名検索",children:jsx(Input,{value:filters.subname||"",onChange:e=>setFilters({...filters,subname:e.target.value})})})
             ] }),
@@ -342,7 +341,7 @@ function AccountingApp() {
               ] })
             ] }),
             /* @__PURE__ */ jsx(GridTable, { heads: ["\u65E5\u4ED8 / \u4ED5\u8A33\u756A\u53F7", "\u6458\u8981 / \u53D6\u5F15\u5148", "\u501F\u65B9\u79D1\u76EE", "\u8CB8\u65B9\u79D1\u76EE", "\u91D1\u984D\uFF08\u5186\uFF09", "\u72B6\u614B", "\u64CD\u4F5C"], rows: filtered.map((j) => {
-              const ls = currentLines(s, j);
+              const ls = currentLines(s, j).slice().sort((a,b)=>(s.accounts.find(x=>x.id===a.account_id)?.account_code||"").localeCompare(s.accounts.find(x=>x.id===b.account_id)?.account_code||"","ja",{numeric:true}));
               return [/* @__PURE__ */ jsxs("div", { className: j.status === "DELETED" ? "deleted" : "", children: [
                 j.transaction_date,
                 /* @__PURE__ */ jsx("br", {}),
@@ -362,7 +361,7 @@ function AccountingApp() {
           page === "補助元帳・残高" && jsx(SubaccountWorkspace,{s,start,end},s.company.id),
           page === "\u7DCF\u52D8\u5B9A\u5143\u5E33" && report && /* @__PURE__ */ jsxs("section", { className: "panel", children: [
             /* @__PURE__ */ jsxs("div", { className: "section-title", children: [
-              /* @__PURE__ */ jsx(Choice, { value: ledgerId, onChange: setLedgerId, options: s.accounts.map((a) => [a.id, `${a.account_code} ${a.account_name}`]) }),
+              /* @__PURE__ */ jsx(Choice, { value: ledgerId, onChange: setLedgerId, options: [...s.accounts].sort((a,b)=>a.account_code.localeCompare(b.account_code,"ja",{numeric:true})).map((a) => [a.id, `${a.account_code} ${a.account_name}`]) }),
               /* @__PURE__ */ jsx("span", { className: "muted", children: "\u6B8B\u9AD8\u306F\u501F\u65B9\u3092\u6B63\u3001\u8CB8\u65B9\u3092\u8CA0\u3068\u3057\u3066\u8868\u793A" })
             ] }),
             (() => {
@@ -386,7 +385,7 @@ function AccountingApp() {
           page === "\u8A66\u7B97\u8868" && report && /* @__PURE__ */ jsxs("section", { className: "panel", children: [
             /* @__PURE__ */ jsx(Check, { ok: Object.values(report.trial).every((v) => v === "0"), label: "\u671F\u9996\u30FB\u767A\u751F\u984D\u30FB\u671F\u672B\u306E\u8CB8\u501F" }),
             /* @__PURE__ */ jsx("p", { className: "muted", children: "\u671F\u9996\u30FB\u671F\u672B\u6B8B\u9AD8\u306F\u501F\u65B9\u3092\u6B63\u3001\u8CB8\u65B9\u3092\u8CA0\u3068\u3057\u3066\u8868\u793A\uFF08\u5186\uFF09" }),
-            /* @__PURE__ */ jsx(GridTable, { heads: ["\u30B3\u30FC\u30C9", "\u52D8\u5B9A\u79D1\u76EE", "\u671F\u9996\u6B8B\u9AD8", "\u501F\u65B9\u767A\u751F\u984D", "\u8CB8\u65B9\u767A\u751F\u984D", "\u671F\u672B\u6B8B\u9AD8"], rows: [...report.rows.map((a) => [a.account_code, a.account_name, money(a.opening), money(a.debit), money(a.credit), money(a.closing)]), ["", "\u5408\u8A08", money(report.trial.opening_difference), money(report.rows.reduce((n, a) => n + BigInt(a.debit), 0n)), money(report.rows.reduce((n, a) => n + BigInt(a.credit), 0n)), money(report.trial.closing_difference)]] })
+            /* @__PURE__ */ jsx(GridTable, { heads: ["\u30B3\u30FC\u30C9", "\u52D8\u5B9A\u79D1\u76EE", "\u671F\u9996\u6B8B\u9AD8", "\u501F\u65B9\u767A\u751F\u984D", "\u8CB8\u65B9\u767A\u751F\u984D", "\u671F\u672B\u6B8B\u9AD8"], rows: [...[...report.rows].sort((a,b)=>a.account_code.localeCompare(b.account_code,"ja",{numeric:true})).map((a) => [a.account_code, a.account_name, money(a.opening), money(a.debit), money(a.credit), money(a.closing)]), ["", "\u5408\u8A08", money(report.trial.opening_difference), money(report.rows.reduce((n, a) => n + BigInt(a.debit), 0n)), money(report.rows.reduce((n, a) => n + BigInt(a.credit), 0n)), money(report.trial.closing_difference)]] })
           ] }),
           page === "P/L" && report && /* @__PURE__ */ jsxs("section", { className: "panel statement", children: [
             /* @__PURE__ */ jsx("p", { className: "muted", children: "\u7A0E\u8A2D\u5B9A\u6E08\u307F\u53D6\u5F15\u306F\u7A0E\u629C\u3002\u7A0E\u60C5\u5831\u672A\u8A2D\u5B9A\u306E\u65E7\u53D6\u5F15\u306F\u5143\u306E\u91D1\u984D\u3067\u3059\u3002" }),

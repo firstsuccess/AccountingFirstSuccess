@@ -2,7 +2,7 @@
 <html lang="ja">
 <head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>ログイン | 会計帳簿</title>
 <style>body{margin:0;background:#f3f6fa;color:#142d4e;font:16px/1.6 system-ui,sans-serif;display:grid;min-height:100svh;place-items:center}main{background:white;border:1px solid #dbe3ec;border-radius:12px;padding:28px;width:min(340px,calc(100vw - 80px))}h1{font-size:24px}label{display:block;margin-top:16px}input,button{box-sizing:border-box;width:100%;font:inherit;padding:10px;border:1px solid #a8bed5;border-radius:6px}button{margin-top:24px;background:#142d4e;color:white;cursor:pointer}button:disabled{opacity:.6}#error{color:#b42318}</style></head>
-<body><main><h1>会計帳簿にログイン</h1><p>ユーザー名とパスワードを入力してください。</p><form id="login"><label for="username">ユーザー名</label><input id="username" autocomplete="username" required><label for="password">パスワード</label><input id="password" type="password" autocomplete="current-password" required><p id="error" role="alert"></p><button>ログイン</button></form></main>
+<body><main><h1>もんじゃ会計にログイン</h1><p>ユーザー名とパスワードを入力してください。</p><form id="login"><label for="username">ユーザー名</label><input id="username" autocomplete="username" required><label for="password">パスワード</label><input id="password" type="password" autocomplete="current-password" required><p id="error" role="alert"></p><button>ログイン</button></form></main>
 <script>
 document.getElementById('login').addEventListener('submit',async event=>{
 event.preventDefault();const button=event.currentTarget.querySelector('button');button.disabled=true;const error=document.getElementById('error');error.textContent='';
