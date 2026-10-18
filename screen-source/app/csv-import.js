@@ -3,7 +3,9 @@ import { Fragment, jsx, jsxs } from "react/jsx-runtime";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-function CSVImport({ s, onSaved }) {
+function CSVImport({ s, onSaved, start, end }) {
+  const [exportFrom,setExportFrom]=useState(start||s.company.start),[exportTo,setExportTo]=useState(end||s.company.end);
+  const validExportRange=!!exportFrom && !!exportTo && exportFrom<=exportTo;
   const [text, setText] = useState(""), [filename, setFilename] = useState(""), [reason, setReason] = useState(""), [preview, setPreview] = useState(null), [error, setError] = useState(""), [message, setMessage] = useState(""), [busy, setBusy] = useState(false);
   async function choose(file) {
     setPreview(null);
@@ -14,7 +16,7 @@ function CSVImport({ s, onSaved }) {
     if (!file) return;
     setBusy(true);
     try {
-      if (file.size > 5e5) throw new Error("CSV\u306F500KB\u4EE5\u5185\u3067\u3059");
+      if (file.size > 5e6) throw new Error("CSV\u306F5MB\u4EE5\u5185\u3067\u3059");
       const bytes = await file.arrayBuffer();
       let decoded;
       try {
@@ -58,9 +60,13 @@ function CSVImport({ s, onSaved }) {
       /* @__PURE__ */ jsx("strong", { children: s.company.name }),
       "\u3002\u30D5\u30A1\u30A4\u30EB\u9078\u629E\u3060\u3051\u3067\u306F\u767B\u9332\u3057\u307E\u305B\u3093\u3002"
     ] }),
+    jsxs("div",{className:"filters",children:[
+      jsxs("label",{className:"field",children:[jsx("span",{children:"取引日 From"}),jsx(Input,{type:"date","aria-label":"取引日 From",value:exportFrom,max:exportTo||undefined,onChange:e=>setExportFrom(e.target.value)})]}),
+      jsxs("label",{className:"field",children:[jsx("span",{children:"取引日 To"}),jsx(Input,{type:"date","aria-label":"取引日 To",value:exportTo,min:exportFrom||undefined,onChange:e=>setExportTo(e.target.value)})]})
+    ]}),
     /* @__PURE__ */ jsxs("p", { children: [
-      /* @__PURE__ */ jsx("a", { className: "textlink", href: `/api/accounting?company=${s.company.id}&export=journal_transfer`, children: "\u518D\u53D6\u8FBC\u7528\u4ED5\u8A33CSV\u3092\u30C0\u30A6\u30F3\u30ED\u30FC\u30C9" }),
-      "\u3057\u3066\u7DE8\u96C6\u3057\u3066\u304F\u3060\u3055\u3044\u30021\u56DE\u306B\u3064\u304D\u660E\u7D30100\u884C\u30FB50\u4F1D\u7968\u30FB500KB\u307E\u3067\u3002"
+      /* @__PURE__ */ jsx("a", { className: "textlink", href: validExportRange ? `/api/accounting?${new URLSearchParams({company:s.company.id,export:"journal_transfer",from:exportFrom,to:exportTo})}` : undefined, "aria-disabled": !validExportRange, onClick:e=>{if(!validExportRange){e.preventDefault();setError("取引日From・Toを正しく指定してください");}}, children: "\u518D\u53D6\u8FBC\u7528\u4ED5\u8A33CSV\u3092\u30C0\u30A6\u30F3\u30ED\u30FC\u30C9" }),
+      "\u3057\u3066\u7DE8\u96C6\u3057\u3066\u304F\u3060\u3055\u3044\u30021\u56DE\u306B\u3064\u304D\u660E\u7D301000\u884C\u30FB500\u4F1D\u7968\u30FB5MB\u307E\u3067\u3002"
     ] }),
     /* @__PURE__ */ jsx("p", { className: "muted", children: "\u4F1D\u7968\u756A\u53F7\u3042\u308A\uFF1A\u65E2\u5B58ACTIVE\u4F1D\u7968\u306E\u5168\u660E\u7D30\u3092\u7F6E\u304D\u63DB\u3048\u3001\u5B58\u5728\u3057\u306A\u3044\u756A\u53F7\u306F\u65B0\u898F\u767B\u9332\u3002\u756A\u53F7\u306A\u3057\uFF1A\u540C\u3058import_group\u306E\u884C\u3092\u65B0\u898F\u8907\u5408\u4ED5\u8A33\u3068\u3057\u3066\u81EA\u52D5\u63A1\u756A\u3057\u307E\u3059\u3002\u524A\u9664\u6E08\u307F\u30FBCLOSED\u30FBLOCKED\u306F\u767B\u9332\u3067\u304D\u307E\u305B\u3093\u3002" }),
     /* @__PURE__ */ jsx("p", { className: "muted", children: "\u501F\u65B9\u30FB\u8CB8\u65B9\u306F\u7A0E\u629C\u672C\u4F53\u306E\u8A18\u5E33\u91D1\u984D\u3001input_amount\u306F\u5165\u529B\u91D1\u984D\u3067\u3059\u3002\u7A0E\u60C5\u5831\u3092\u6307\u5B9A\u3059\u308B\u5834\u5408\u306F\u7A0E\u7387\u30FB\u672C\u4F53\u30FB\u7A0E\u984D\u30FB\u7A0E\u8FBC\u984D\u3082\u5FC5\u9808\u3067\u3059\u3002\u81EA\u52D5\u7A0E\u660E\u7D30\u3092CSV\u306B\u542B\u3081\u306A\u3044\u3067\u304F\u3060\u3055\u3044\u3002Excel\u3067\u306F\u4F1D\u7968\u756A\u53F7\u30FB\u79D1\u76EE\u30B3\u30FC\u30C9\u3092\u6587\u5B57\u5217\u3068\u3057\u3066\u8AAD\u307F\u8FBC\u307F\u3001\u5148\u982D\u306E0\u3092\u4FDD\u6301\u3057\u3066\u304F\u3060\u3055\u3044\u3002" }),

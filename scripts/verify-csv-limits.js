@@ -1,0 +1,32 @@
+import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import vm from 'node:vm';
+import {createCompany,csv,reports} from '../lib/core.js';
+import {assignCompanyId} from '../lib/numbering.js';
+import {parseJournalCSV,prepareImport} from '../lib/csv-import.js';
+import {transferRows,transferColumns} from '../lib/csv-transfer.js';
+const s=assignCompanyId(createCompany('csv-limit-test','CSV limits','2026-01-01','2026-12-31'),'C000000001');
+const rows=Array.from({length:500},(_,i)=>['1100','3000'].map((account_code,side)=>({company_id:s.company.id,journal_number:'',import_group:'group-'+i,transaction_date:i%2?'2026-02-28':'2026-03-01',description:'batch verification',account_code,debit_amount:side===0?'100':'0',credit_amount:side===1?'100':'0'}))).flat();
+const text=csv(rows);assert.equal(parseJournalCSV(text).length,1000);
+const before=JSON.stringify(s),result=prepareImport(s,text,s.company.owner,'verification','1000-lines.csv');
+assert.equal(result.summary.length,500);assert.equal(result.after.journals.length,500);assert.equal(result.after.lines.length,1000);assert.equal(reports(result.after,'2026-01-01','2026-12-31').bs.difference,'0');assert.equal(JSON.stringify(s),before);
+assert.throws(()=>parseJournalCSV(csv([...rows,rows[0]])),/1000/);
+const tooManyGroups=Array.from({length:501},(_,i)=>({...rows[0],import_group:'unique-'+i}));assert.throws(()=>prepareImport(s,csv(tooManyGroups),s.company.owner,'verification','501-groups.csv'),/500/);
+assert.throws(()=>parseJournalCSV('x'.repeat(5000001)),/5MB/);
+// A 5MB ASCII CSV payload passes the parser's size check; one extra byte fails.
+const keys=['company_id','journal_number','transaction_date','description','account_code','debit_amount','credit_amount'];
+const prefix=keys.join(',')+'\nC000000001,,2026-01-01,',suffix=',1100,1,0';
+const exact=prefix+'x'.repeat(5000000-prefix.length-suffix.length)+suffix;assert.equal(exact.length,5000000);assert.equal(parseJournalCSV(exact).length,1);
+const subset=transferRows(result.after,{from:'2026-02-28',to:'2026-02-28'});assert.equal(subset.length,500);assert.ok(subset.every(r=>r.transaction_date==='2026-02-28'));assert.equal(transferRows(result.after).length,1000);
+assert.equal(transferRows(result.after,{from:'2026-02-28',to:'2026-03-01'}).length,1000);assert.equal(transferRows(result.after,{from:'2026-04-01',to:'2026-04-30'}).length,0);
+assert.throws(()=>transferRows(result.after,{from:'2026-03-01',to:'2026-02-28'}),/From/);assert.throws(()=>transferRows(result.after,{from:'2026-02-30'}),/日付/);
+assert.ok(csv([],transferColumns).includes('"journal_number","import_group"'));
+// Verify actual shipped component state and URL generation, including inverted dates.
+const bundle=fs.readFileSync(new URL('../public/app.js',import.meta.url),'utf8'),start=bundle.indexOf('function CSVImport('),component=bundle.slice(start,bundle.indexOf('\n}',start)+2);
+let hooks=[],cursor=0;const jsx=(type,props)=>({type,props});const context={URLSearchParams,BigInt,import_jsx_runtime19:{jsx,jsxs:jsx},import_react3:{Fragment:'fragment',useState:init=>{const i=cursor++;if(hooks[i]===undefined)hooks[i]=init;return [hooks[i],value=>{hooks[i]=value;}];}}};
+for(const m of component.matchAll(/jsx[s]?\)\(([A-Z]\w+)/g))context[m[1]]=m[1];vm.createContext(context);vm.runInContext(component,context);
+const nodes=tree=>{const out=[];function walk(n){if(Array.isArray(n))n.forEach(walk);else if(n?.props){out.push(n);walk(n.props.children);}}walk(tree);return out;};
+const render=()=>{cursor=0;return nodes(context.CSVImport({s,start:'2026-02-01',end:'2026-02-28',onSaved:()=>{}}));};
+let elements=render(),link=elements.find(n=>n.type==='a');assert.equal(new URL(link.props.href,'http://localhost').searchParams.get('from'),'2026-02-01');
+elements.find(n=>n.props['aria-label']==='取引日 From').props.onChange({target:{value:'2026-03-01'}});elements=render();link=elements.find(n=>n.type==='a');assert.equal(link.props.href,undefined);let prevented=false;link.props.onClick({preventDefault(){prevented=true;}});assert.ok(prevented);
+console.log('PASS: 1000 lines/500 journals, overflow rejection, exact 5MB parser boundary, input immutability, inclusive date ranges, empty template, invalid dates and shipped date-filter UI. No DB writes.');

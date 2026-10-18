@@ -8,6 +8,7 @@ const trans=(runtime,react)=>s=>s.replace(/\b(jsxs|jsx)\(/g,`(0, ${runtime}.$1)(
 bundle=bundle.replace(fn(bundle,'currentLines'),fn(read('lib/core.js'),'currentLines'));
 for(const name of ['subaccountName','cleanSubaccount','wildcardLike','oppositeLines'])bundle=bundle.replace(fn(bundle,name),fn(read('lib/subaccounts.js'),name));
 for(const [file,names,runtime,react] of [
+ ['screen-source/app/csv-import.js',['CSVImport'],'import_jsx_runtime19','import_react3'],
  ['screen-source/app/tax-ui.js',['editorLines','TaxLineEditor'],'import_jsx_runtime24','import_react7'],
  ['screen-source/app/subaccount-ui.js',['SubaccountInput','SubaccountWorkspace'],'import_jsx_runtime31','import_react8'],
  ['screen-source/app/accounting-app.js',['AccountingApp'],'import_jsx_runtime31','import_react8']

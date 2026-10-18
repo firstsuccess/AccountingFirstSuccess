@@ -79,13 +79,13 @@ const server=http.createServer(async(req,res)=>{
  if(!url.searchParams.has('export'))return json(res,s);
  const type=url.searchParams.get('export');let content,mime;
  if(type==='all'){content=JSON.stringify({format:'jp-ledger',schema_version:2,exported_at:new Date().toISOString(),...s},null,2);mime='application/json';}
- else {const data=type==='journal_transfer'?transferRows(s):type==='lines'?backupLineRows(s):type==='company'?[s.company]:tables.includes(type)?s[type]:null;if(!Array.isArray(data))throw new Error('不正な出力形式');content=csv(data,type==='journal_transfer'?transferColumns:type==='lines'?backupLineColumns:csvColumns[type]);mime='text/csv';}
+ else {const data=type==='journal_transfer'?transferRows(s,{from:url.searchParams.get('from')||'',to:url.searchParams.get('to')||''}):type==='lines'?backupLineRows(s):type==='company'?[s.company]:tables.includes(type)?s[type]:null;if(!Array.isArray(data))throw new Error('不正な出力形式');content=csv(data,type==='journal_transfer'?transferColumns:type==='lines'?backupLineColumns:csvColumns[type]);mime='text/csv';}
  res.writeHead(200,{'Content-Type':mime+'; charset=utf-8','Content-Disposition':`attachment; filename="${type==='all'?'ledger-backup.json':type+'.csv'}"`});return res.end(content);
  }
  if(req.method!=='POST')return json(res,{error:'Method not allowed'},405);
  if(!isAllowedOrigin(req))return json(res,{error:'異なるサイトからの更新は拒否しました'},403);
  if(!req.headers['content-type']?.startsWith('application/json'))return json(res,{error:'JSON形式が必要です'},415);
- let bytes=0,chunks=[];for await(const chunk of req){bytes+=chunk.length;if(bytes>1000000){json(res,{error:'入力サイズが上限を超えています'},413);return;}chunks.push(chunk);}
+ let bytes=0,chunks=[];for await(const chunk of req){bytes+=chunk.length;if(bytes>30100000){json(res,{error:'入力サイズが上限を超えています'},413);return;}chunks.push(chunk);}
  const body=Buffer.concat(chunks).toString('utf8'),c=JSON.parse(body);
  if(!['csv_preview','csv_execute'].includes(c.type)&&body.length>100000)return json(res,{error:'入力サイズが上限を超えています'},413);
  if(c.type==='test')throw new Error('新しいテスト会社は作成できません');

@@ -446,7 +446,7 @@ function AccountingApp() {
             /* @__PURE__ */ jsx("p", { className: "muted", children: "\u5909\u66F4\u30FB\u524A\u9664\u3067\u304D\u306A\u3044\u5C65\u6B74\u3067\u3059\u3002\u8A73\u7D30\u304B\u3089\u5909\u66F4\u524D\u30FB\u5909\u66F4\u5F8C\u306E\u5024\u3092\u78BA\u8A8D\u3067\u304D\u307E\u3059\u3002" }),
             /* @__PURE__ */ jsx(GridTable, { heads: ["\u5B9F\u884C\u65E5\u6642\uFF08\u65E5\u672C\u6642\u9593\uFF09", "\u64CD\u4F5C", "\u5BFE\u8C61", "\u5B9F\u884C\u8005", "\u7406\u7531", "\u8A73\u7D30"], rows: [...s.audit].sort((a, b) => b.timestamp.localeCompare(a.timestamp)).map((a) => [new Date(a.timestamp).toLocaleString("ja-JP", { timeZone: "Asia/Tokyo" }), a.event_type, a.target_type, /* @__PURE__ */ jsx("span", { title: a.user, children: a.user === s.company.owner ? "Administrator" : a.user }), a.reason, /* @__PURE__ */ jsx(Button, { variant: "ghost", onClick: () => setDetail({ ...a, audit: true }), children: "\u8A73\u7D30" })]) })
           ] }),
-          page === "CSV\u53D6\u8FBC" && /* @__PURE__ */ jsx(CSVImport, { s, onSaved: (after) => {
+          page === "CSV\u53D6\u8FBC" && /* @__PURE__ */ jsx(CSVImport, { s, start, end, onSaved: (after) => {
             setS((current) => current?.company.id === after.company.id ? after : current);
             listCompanies().catch(() => {
             });
