@@ -5,11 +5,13 @@ const write=(p,s)=>fs.writeFileSync(p,s);
 let bundle=read('public/app.js');
 function fn(source,name){const start=source.indexOf('function '+name+'('),end=source.indexOf('\n}\n',start);if(start<0||end<0)throw new Error('Missing function '+name);return source.slice(start,end+2);}
 const trans=(runtime,react)=>s=>s.replace(/\b(jsxs|jsx)\(/g,`(0, ${runtime}.$1)(`).replace(/\bFragment\b/g,react+'.Fragment').replace(/\b(useState|useEffect|useMemo)\(/g,`(0, ${react}.$1)(`).replace(/\bHistory\b/g,'RotateCcwClock');
+bundle=bundle.replace(fn(bundle,'openingPlan'),fn(read('lib/core.js'),'openingPlan'));
 bundle=bundle.replace(fn(bundle,'currentLines'),fn(read('lib/core.js'),'currentLines'));
 const balanceFunction=fn(read('lib/core.js'),'journalBalances');
 bundle=bundle.includes('function journalBalances(')?bundle.replace(fn(bundle,'journalBalances'),balanceFunction):bundle.replace('function ledger(',balanceFunction+'\nfunction ledger(');
 for(const name of ['subaccountName','cleanSubaccount','wildcardLike','oppositeLines'])bundle=bundle.replace(fn(bundle,name),fn(read('lib/subaccounts.js'),name));
 for(const [file,names,runtime,react] of [
+ ['screen-source/app/opening-balances.js',['OpeningBalances'],'import_jsx_runtime31','import_react8'],
  ['screen-source/app/csv-import.js',['CSVImport'],'import_jsx_runtime19','import_react3'],
  ['screen-source/app/tax-ui.js',['editorLines','TaxLineEditor'],'import_jsx_runtime24','import_react7'],
  ['screen-source/app/subaccount-ui.js',['SubaccountInput','SubaccountWorkspace'],'import_jsx_runtime31','import_react8'],

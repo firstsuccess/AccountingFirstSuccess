@@ -46,7 +46,7 @@ const firstYear=structuredClone(s);
 for(const p of s.periods)s=mutate(s,{type:'period',target:'periods',id:p.id,status:'CLOSED',reason:'verification'},user);
 s=mutate(s,{type:'period',target:'years',id:s.years[0].id,status:'LOCKED',reason:'verification'},user);
 s=mutate(s,{type:'year',start:'2026-01-01',end:'2026-12-31'},user);
-const targets=openingPlan(s,s.years[1].id).rows.map(a=>({account_id:a.id,debit_amount:BigInt(a.target)>0n?a.target:'0',credit_amount:BigInt(a.target)<0n?String(-BigInt(a.target)):'0'}));
+const targets=openingPlan(s,s.years[1].id).rows.map(a=>({account_id:a.id,subaccount_name:a.subaccount_name,debit_amount:BigInt(a.target)>0n?a.target:'0',credit_amount:BigInt(a.target)<0n?String(-BigInt(a.target)):'0'}));
 for(const code of ['1100','3000']){const b=targets.find(x=>x.account_id===acc(code).id);if(code==='1100')b.debit_amount=String(BigInt(b.debit_amount)+200n);else b.credit_amount=String(BigInt(b.credit_amount)+200n);}
 s=mutate(s,{type:'opening',year_id:s.years[1].id,balances:targets,reason:'verification'},user);
 post('2026-01-02','1100','1200',10000,'銀行','A商事');

@@ -24020,29 +24020,38 @@ function openingPlan(s, yearId, balances) {
   assert(existing.length <= 1, "期首残高仕訳が重複しています");
   const old = existing[0];
   const baseline = reports({ ...s, journals: s.journals.filter((j) => j.id !== old?.id) }, y.start, y.start).rows;
-  const accounts = baseline.filter((a) => a.statement_type === "BS");
-  const rows = accounts.map((a) => {
-    const adjustment = old ? currentLines(s, old).filter((l) => l.account_id === a.id).reduce((n, l) => n + BigInt(l.debit_amount) - BigInt(l.credit_amount), 0n) : 0n;
-    return { ...a, baseline: a.opening, target: String(BigInt(a.opening) + adjustment) };
+  const accounts = baseline.filter(a=>a.statement_type==='BS').sort((a,b)=>a.account_code.localeCompare(b.account_code,'ja',{numeric:true}));
+  const past=postingLines(s,y.start).filter(l=>l.date<y.start), oldLines=old?currentLines(s,old):[];
+  const rows=accounts.flatMap(a=>{
+    const names=[...new Set(['',...past.filter(l=>l.account_id===a.id).map(l=>subaccountName(s,l)),...oldLines.filter(l=>l.account_id===a.id).map(l=>subaccountName(s,l))])].sort((a,b)=>a.localeCompare(b,'ja'));
+    const namedTotal=past.filter(l=>l.account_id===a.id&&subaccountName(s,l)).reduce((n,l)=>n+BigInt(l.debit_amount)-BigInt(l.credit_amount),0n);
+    return names.map(name=>{
+      const base=name?past.filter(l=>l.account_id===a.id&&subaccountName(s,l)===name).reduce((n,l)=>n+BigInt(l.debit_amount)-BigInt(l.credit_amount),0n):BigInt(a.opening)-namedTotal;
+      const adjustment=oldLines.filter(l=>l.account_id===a.id&&subaccountName(s,l)===name).reduce((n,l)=>n+BigInt(l.debit_amount)-BigInt(l.credit_amount),0n);
+      return {...a,subaccount_name:name,baseline:String(base),target:String(base+adjustment)};
+    });
   });
-  if (!balances) return { year: y, old, rows };
-  assert(Array.isArray(balances) && balances.length === accounts.length, "全BS科目の期首残高を指定してください");
-  assert(new Set(balances.map((b) => b.account_id)).size === accounts.length, "勘定科目が重複しています");
-  let targetTotal = 0n;
-  const targets = balances.map((b) => {
-    const a = rows.find((a) => a.id === b.account_id);
-    assert(a, "BS科目だけを指定してください");
-    const debit = amount(b.debit_amount || 0), credit = amount(b.credit_amount || 0);
-    assert(!debit || !credit, "同じ科目の借方・貸方を同時に入力できません");
-    const target = BigInt(debit) - BigInt(credit), delta = target - BigInt(a.baseline);
-    assert(a.active || target === BigInt(a.target), "無効科目の期首残高は変更できません");
-    targetTotal += target;
-    return { ...a, target: String(target), delta: String(delta) };
+  if(!balances)return {year:y,old,rows};
+  assert(Array.isArray(balances)&&balances.length<=1000,'期首残高の入力行数が不正です');
+  const key=b=>JSON.stringify([b.account_id??b.id,b.subaccount_name||'']);
+  const normalized=balances.map(b=>({...b,subaccount_name:cleanSubaccount(b.subaccount_name||'')}));
+  assert(new Set(normalized.map(key)).size===normalized.length,'勘定科目・補助科目が重複しています');
+  assert(rows.every(r=>normalized.some(b=>key(b)===key(r))),'全BS科目・既存補助科目の期首残高を指定してください');
+  let targetTotal=0n;
+  const targets=normalized.map(b=>{
+    const account=accounts.find(a=>a.id===b.account_id);assert(account,'BS科目だけを指定してください');
+    const a=rows.find(r=>key(r)===key(b))||{...account,subaccount_name:b.subaccount_name,baseline:'0',target:'0'};
+    const debit=amount(b.debit_amount||0),credit=amount(b.credit_amount||0);
+    assert(!debit||!credit,'同じ科目の借方・貸方を同時に入力できません');
+    const target=BigInt(debit)-BigInt(credit),delta=target-BigInt(a.baseline);
+    assert(a.active||target===BigInt(a.target),'無効科目の期首残高は変更できません');
+    assert((a.subaccount_input||'OPTIONAL')!=='NONE'||!b.subaccount_name||rows.some(r=>key(r)===key(b)),'補助科目は不要の設定です：'+a.account_name);
+    targetTotal+=target;return {...a,target:String(target),delta:String(delta)};
   });
-  assert(targetTotal === 0n, "期首残高の貸借が一致していません");
-  const lines = targets.filter((a) => BigInt(a.delta) !== 0n).map((a) => ({ account_id: a.id, debit_amount: amount(BigInt(a.delta) > 0n ? a.delta : "0"), credit_amount: amount(BigInt(a.delta) < 0n ? String(-BigInt(a.delta)) : "0"), tax_code: "UNSPECIFIED", line_description: "期首残高の差額調整" }));
-  assert(lines.reduce((n, l) => n + BigInt(l.debit_amount) - BigInt(l.credit_amount), 0n) === 0n, "繰越残高の貸借が一致していません。元データを確認してください");
-  return { year: y, old, rows: targets, lines, changed: targets.some((a) => a.target !== rows.find((r) => r.id === a.id).target) };
+  assert(targetTotal===0n,'期首残高の貸借が一致していません');
+  const lines=targets.filter(a=>BigInt(a.delta)!==0n).map(a=>({account_id:a.id,subaccount_name:a.subaccount_name,debit_amount:amount(BigInt(a.delta)>0n?a.delta:'0'),credit_amount:amount(BigInt(a.delta)<0n?String(-BigInt(a.delta)):'0'),tax_code:'UNSPECIFIED',line_description:'期首残高の差額調整'}));
+  assert(lines.reduce((n,l)=>n+BigInt(l.debit_amount)-BigInt(l.credit_amount),0n)===0n,'繰越残高の貸借が一致していません。元データを確認してください');
+  return {year:y,old,rows:targets,lines,changed:targets.some(a=>a.target!==(rows.find(r=>key(r)===key(a))?.target||'0'))};
 }
 function reports(s, start, end) {
   date(start);
@@ -25787,34 +25796,38 @@ function download(text, name, type = "text/csv;charset=utf-8") {
 
 function OpeningBalances({ s, year, act, busy }) {
   const plan = openingPlan(s, year.id);
-  const [balances, setBalances] = (0, import_react8.useState)(() => plan.rows.map((a) => ({ account_id: a.id, debit_amount: BigInt(a.target) > 0n ? a.target : "0", credit_amount: BigInt(a.target) < 0n ? String(-BigInt(a.target)) : "0" })));
+  const [balances, setBalances] = (0, import_react8.useState)(() => plan.rows.map((a) => ({ account_id: a.id, subaccount_name: a.subaccount_name, debit_amount: BigInt(a.target) > 0n ? a.target : "0", credit_amount: BigInt(a.target) < 0n ? String(-BigInt(a.target)) : "0" })));
   const [reason, setReason] = (0, import_react8.useState)("");
   const [confirmed, setConfirmed] = (0, import_react8.useState)(false);
   const startJournals = s.journals.filter((j) => j.status === "ACTIVE" && j.transaction_date === year.start && j.journal_kind !== "OPENING").length;
   const debit = balances.reduce((n, b) => n + BigInt(b.debit_amount || "0"), 0n);
   const credit = balances.reduce((n, b) => n + BigInt(b.credit_amount || "0"), 0n);
   const editable = year.status === "OPEN" && s.periods.find((p) => p.year_id === year.id && p.start === year.start)?.status === "OPEN" && s.years.filter((y) => y.end < year.start).every((y) => y.status === "LOCKED");
-  const changed = balances.some((b, i) => String(BigInt(b.debit_amount || "0") - BigInt(b.credit_amount || "0")) !== plan.rows[i].target);
+  const rowFor = b => plan.rows.find(a=>a.id===b.account_id && a.subaccount_name===(b.subaccount_name || '')) || {...s.accounts.find(a=>a.id===b.account_id),baseline:'0',target:'0'};
+  const changed = balances.some(b=>String(BigInt(b.debit_amount || '0')-BigInt(b.credit_amount || '0'))!==rowFor(b).target);
+  const add = a => setBalances([...balances,{account_id:a.id,subaccount_name:'',debit_amount:'0',credit_amount:'0',added:true}].sort((a,b)=>s.accounts.find(x=>x.id===a.account_id).account_code.localeCompare(s.accounts.find(x=>x.id===b.account_id).account_code,'ja',{numeric:true})));
+  const validNames = balances.every((b,i)=>!b.subaccount_name.includes('*') && (!b.added || b.subaccount_name.trim()) && !balances.some((v,j)=>j!==i && v.account_id===b.account_id && v.subaccount_name.trim()===b.subaccount_name.trim()));
   const update = (index, key, value) => setBalances(balances.map((b, i) => i === index ? { ...b, [key]: value.replace(/\D/g, "").slice(0, 12) } : b));
   return (0, import_jsx_runtime31.jsxs)("details", { className: "opening-settings", children: [
     (0, import_jsx_runtime31.jsx)("summary", { children: "期首残高を設定（差額仕訳）" }),
-    (0, import_jsx_runtime31.jsx)("p", { children: "設定したい期首残高を借方・貸方で入力してください。繰越残高との差額だけを保存し、当期発生額には含めません。再保存は同じ仕訳を改訂します。" }),
+    (0, import_jsx_runtime31.jsx)("p", { children: "設定したい期首残高を借方・貸方で入力してください。繰越残高との差額だけを保存し、当期発生額には含めません。補助科目行を追加して内訳を入力できます。補助科目なしの行も含めた合計を設定してください。再保存は同じ仕訳を改訂します。" }),
     !editable && (0, import_jsx_runtime31.jsx)("p", { className: "muted", children: "対象年度と期首月をOPENにし、前年度までをLOCKすると設定できます。" }),
     (0, import_jsx_runtime31.jsx)("form", { onSubmit: (e) => { e.preventDefault(); act({ type: "opening", year_id: year.id, balances, reason, confirm_start_journals: confirmed }); }, children: (0, import_jsx_runtime31.jsxs)("fieldset", { disabled: busy || !editable, children: [
       (0, import_jsx_runtime31.jsx)("div", { className: "opening-table-scroll", children: (0, import_jsx_runtime31.jsxs)("table", { className: "opening-table", children: [
-        (0, import_jsx_runtime31.jsx)("thead", { children: (0, import_jsx_runtime31.jsx)("tr", { children: ["勘定科目", "繰越残高（借＋／貸−）", "設定残高・借方", "設定残高・貸方", "保存する差額（借＋／貸−）"].map((label) => (0, import_jsx_runtime31.jsx)("th", { children: label }, label)) }) }),
-        (0, import_jsx_runtime31.jsx)("tbody", { children: plan.rows.map((a, i) => (0, import_jsx_runtime31.jsx)("tr", { children: [
-          (0, import_jsx_runtime31.jsx)("td", { children: `${a.account_code} ${a.account_name}` }),
+        (0, import_jsx_runtime31.jsx)("thead", { children: (0, import_jsx_runtime31.jsx)("tr", { children: ["勘定科目", "補助科目", "繰越残高（借＋／貸−）", "設定残高・借方", "設定残高・貸方", "保存する差額（借＋／貸−）"].map((label) => (0, import_jsx_runtime31.jsx)("th", { children: label }, label)) }) }),
+        (0, import_jsx_runtime31.jsx)("tbody", { children: balances.map((b, i) => { const a=rowFor(b); return (0, import_jsx_runtime31.jsx)("tr", { children: [
+          (0, import_jsx_runtime31.jsxs)("td", { children: [a.account_code+' '+a.account_name, a.active && a.subaccount_input!=='NONE' && (0, import_jsx_runtime31.jsx)(Button,{type:'button',onClick:()=>add(a),children:'補助科目行を追加'})] }),
+          (0, import_jsx_runtime31.jsxs)("td", { children: [b.added ? (0, import_jsx_runtime31.jsx)(Input,{maxLength:300,placeholder:'補助科目名（自由入力）',value:b.subaccount_name,onChange:e=>setBalances(balances.map((v,n)=>n===i?{...v,subaccount_name:e.target.value}:v))}) : (b.subaccount_name || '（補助科目なし）'), b.added && (0, import_jsx_runtime31.jsx)(Button,{type:'button',onClick:()=>setBalances(balances.filter((_,n)=>n!==i)),children:'行を削除'})] }),
           (0, import_jsx_runtime31.jsx)("td", { children: a.baseline }),
           (0, import_jsx_runtime31.jsx)("td", { children: (0, import_jsx_runtime31.jsx)(Input, { "aria-label": `${a.account_name} 期首借方`, inputMode: "numeric", value: balances[i].debit_amount, disabled: !a.active, onChange: (e) => update(i, "debit_amount", e.target.value) }) }),
           (0, import_jsx_runtime31.jsx)("td", { children: (0, import_jsx_runtime31.jsx)(Input, { "aria-label": `${a.account_name} 期首貸方`, inputMode: "numeric", value: balances[i].credit_amount, disabled: !a.active, onChange: (e) => update(i, "credit_amount", e.target.value) }) }),
           (0, import_jsx_runtime31.jsx)("td", { children: String(BigInt(balances[i].debit_amount || "0") - BigInt(balances[i].credit_amount || "0") - BigInt(a.baseline)) })
-        ] }, a.id)) })
+        ] }, i); }) })
       ] }) }),
       (0, import_jsx_runtime31.jsx)("p", { role: "status", children: `借方合計 ${debit}円 ／ 貸方合計 ${credit}円 ／ 差額 ${debit - credit}円` }),
       startJournals > 0 && (0, import_jsx_runtime31.jsxs)("label", { className: "row", children: [(0, import_jsx_runtime31.jsx)("input", { type: "checkbox", required: true, checked: confirmed, onChange: (e) => setConfirmed(e.target.checked) }), `期首日に通常仕訳が${startJournals}件あります。開始残高の重複がないことを確認しました。既存の開始残高仕訳は自動変換されません。`] }),
       (0, import_jsx_runtime31.jsxs)("label", { children: ["設定理由（必須）", (0, import_jsx_runtime31.jsx)(Input, { required: true, maxLength: 300, value: reason, onChange: (e) => setReason(e.target.value) })] }),
-      (0, import_jsx_runtime31.jsx)(Button, { type: "submit", disabled: !changed || debit !== credit || !reason.trim(), children: "差額を期首残高仕訳として保存" })
+      (0, import_jsx_runtime31.jsx)(Button, { type: "submit", disabled: !validNames || !changed || debit !== credit || !reason.trim(), children: "差額を期首残高仕訳として保存" })
     ] }) })
   ] });
 }
@@ -25872,7 +25885,7 @@ function SubaccountInput({s,editor,line,onChange,inputId}) {
  ]});
 }
 function SubaccountWorkspace({s,start,end}) {
- const [account,setAccount]=(0, import_react8.useState)(s.accounts[0]?.id||''),[search,setSearch]=(0, import_react8.useState)(''),[all,setAll]=(0, import_react8.useState)(false),[data,setData]=(0, import_react8.useState)(null),[name,setName]=(0, import_react8.useState)(null),[ledgerData,setLedgerData]=(0, import_react8.useState)(null),[offset,setOffset]=(0, import_react8.useState)(0),[error,setError]=(0, import_react8.useState)('');
+ const [account,setAccount]=(0, import_react8.useState)([...s.accounts].sort((a,b)=>a.account_code.localeCompare(b.account_code,'ja',{numeric:true}))[0]?.id||''),[search,setSearch]=(0, import_react8.useState)(''),[all,setAll]=(0, import_react8.useState)(false),[data,setData]=(0, import_react8.useState)(null),[name,setName]=(0, import_react8.useState)(null),[ledgerData,setLedgerData]=(0, import_react8.useState)(null),[offset,setOffset]=(0, import_react8.useState)(0),[error,setError]=(0, import_react8.useState)('');
  (0, import_react8.useEffect)(()=>{setName(null);setOffset(0);},[account,start,end,s.company.id]);
  (0, import_react8.useEffect)(()=>{
   setData(null);setLedgerData(null);setError('');const c=new AbortController();
@@ -25883,8 +25896,9 @@ function SubaccountWorkspace({s,start,end}) {
  },[account,start,end,s.company.id,s.company.version,search,all,name,offset]);
  return (0, import_jsx_runtime31.jsxs)('section',{className:'panel subaccount-report',children:[
   (0, import_jsx_runtime31.jsx)('h2',{children:name===null?'補助科目別残高':'補助元帳'}),
+  (0, import_jsx_runtime31.jsx)('p',{className:'muted',children:'表示期間：'+start+' ～ '+end}),
   (0, import_jsx_runtime31.jsx)('p',{className:'muted',children:'補助科目は仕訳明細の自由入力で使用できます。旧マスタのデータは保持しています。残高は科目の通常残高方向で表示します。期首差額・繰越損益の補助未配分分は「補助科目なし」に含みます。'}),
-  (0, import_jsx_runtime31.jsxs)('div',{className:'filters',children:[(0, import_jsx_runtime31.jsx)('select',{'aria-label':'勘定科目',value:account,onChange:e=>{setAccount(e.target.value);setOffset(0);},children:s.accounts.map(a=>(0, import_jsx_runtime31.jsx)('option',{value:a.id,children:a.account_code+' '+a.account_name},a.id))}),(0, import_jsx_runtime31.jsx)('input',{'aria-label':'補助科目名の部分一致検索',placeholder:'補助科目名の部分一致検索',value:search,onChange:e=>{setSearch(e.target.value);setName(null);setOffset(0);}}),(0, import_jsx_runtime31.jsxs)('label',{children:[(0, import_jsx_runtime31.jsx)('input',{type:'checkbox',checked:all,onChange:e=>{setAll(e.target.checked);setOffset(0);}}),'全件表示（残高ゼロを含む）']})]}),
+  (0, import_jsx_runtime31.jsxs)('div',{className:'filters',children:[(0, import_jsx_runtime31.jsx)('select',{'aria-label':'勘定科目',value:account,onChange:e=>{setAccount(e.target.value);setOffset(0);},children:[...s.accounts].sort((a,b)=>a.account_code.localeCompare(b.account_code,'ja',{numeric:true})).map(a=>(0, import_jsx_runtime31.jsx)('option',{value:a.id,children:a.account_code+' '+a.account_name},a.id))}),(0, import_jsx_runtime31.jsx)('input',{'aria-label':'補助科目名の部分一致検索',placeholder:'補助科目名の部分一致検索',value:search,onChange:e=>{setSearch(e.target.value);setName(null);setOffset(0);}}),(0, import_jsx_runtime31.jsxs)('label',{children:[(0, import_jsx_runtime31.jsx)('input',{type:'checkbox',checked:all,onChange:e=>{setAll(e.target.checked);setOffset(0);}}),'全件表示（残高ゼロを含む）']})]}),
   error&&(0, import_jsx_runtime31.jsx)('p',{className:'alert',children:error}),
   data&&(0, import_jsx_runtime31.jsxs)(import_react8.Fragment,{children:[(0, import_jsx_runtime31.jsx)('p',{children:'勘定科目残高（全補助・空白合計）：'+subMoney(data.total)+' 円'}),(0, import_jsx_runtime31.jsx)('table',{children:(0, import_jsx_runtime31.jsxs)(import_react8.Fragment,{children:[(0, import_jsx_runtime31.jsx)('thead',{children:(0, import_jsx_runtime31.jsx)('tr',{children:['補助科目','期首残高','借方','貸方','残高'].map(h=>(0, import_jsx_runtime31.jsx)('th',{children:h},h))})}),(0, import_jsx_runtime31.jsx)('tbody',{children:data.rows.map(r=>(0, import_jsx_runtime31.jsx)('tr',{children:[(0, import_jsx_runtime31.jsx)('td',{children:(0, import_jsx_runtime31.jsx)('button',{type:'button',onClick:()=>{setName(r.name);setOffset(0);},children:r.name||'（補助科目なし）'})}),...['opening','debit','credit','balance'].map(k=>(0, import_jsx_runtime31.jsx)('td',{children:subMoney(k==='opening'&&data.account.normal_balance==='CREDIT'?String(-BigInt(r[k])):r[k])},k))]},r.name))})]})}),data.has_more&&(0, import_jsx_runtime31.jsx)('p',{children:'次のページに続きます。'}),(0, import_jsx_runtime31.jsx)('button',{type:'button',disabled:offset===0,onClick:()=>setOffset(Math.max(0,offset-50)),children:'前の50件'}),(0, import_jsx_runtime31.jsx)('button',{type:'button',disabled:!data.has_more,onClick:()=>setOffset(offset+50),children:'次の50件'})]}),
   ledgerData&&(0, import_jsx_runtime31.jsxs)(import_react8.Fragment,{children:[(0, import_jsx_runtime31.jsx)('button',{type:'button',onClick:()=>{setName(null);setOffset(0);},children:'残高一覧へ'}),(0, import_jsx_runtime31.jsx)('h3',{children:ledgerData.account.account_name+' / '+(name||'（補助科目なし）')}),(0, import_jsx_runtime31.jsx)('p',{children:'繰越残高：'+subMoney(ledgerData.opening)+' 円'}),(0, import_jsx_runtime31.jsx)('table',{children:(0, import_jsx_runtime31.jsxs)(import_react8.Fragment,{children:[(0, import_jsx_runtime31.jsx)('thead',{children:(0, import_jsx_runtime31.jsx)('tr',{children:['仕訳日','仕訳番号','勘定科目','補助科目','摘要','借方','貸方','残高'].map(h=>(0, import_jsx_runtime31.jsx)('th',{children:h},h))})}),(0, import_jsx_runtime31.jsx)('tbody',{children:ledgerData.rows.map(r=>(0, import_jsx_runtime31.jsx)('tr',{children:[r.date,r.number,ledgerData.account.account_name,name||'（補助科目なし）',r.description+(r.line_description?' / '+r.line_description:''),subMoney(r.debit),subMoney(r.credit),subMoney(r.balance)].map((v,i)=>(0, import_jsx_runtime31.jsx)('td',{children:v},i))},r.id))})]})}),(0, import_jsx_runtime31.jsx)('p',{children:'期末残高：'+subMoney(ledgerData.closing)+' 円'}),(0, import_jsx_runtime31.jsx)('button',{type:'button',disabled:offset===0,onClick:()=>setOffset(Math.max(0,offset-200)),children:'前の200件'}),(0, import_jsx_runtime31.jsx)('button',{type:'button',disabled:offset+ledgerData.rows.length>=(ledgerData.rows[0]?.total||0),onClick:()=>setOffset(offset+200),children:'次の200件'})]})
@@ -26097,7 +26111,7 @@ function AccountingApp() {
             else setError("\u65E2\u5B58\u306E\u300C\u30C6\u30B9\u30C8\u300D\u4F1A\u793E\u304C\u898B\u3064\u304B\u308A\u307E\u305B\u3093");
           }, children: "\u65E2\u5B58\u306E\u30C6\u30B9\u30C8\u4F1A\u793E\u3092\u958B\u304F" })
         ] }) : /* @__PURE__ */ (0, import_jsx_runtime31.jsxs)(import_react8.Fragment, { children: [
-          ["\u30C0\u30C3\u30B7\u30E5\u30DC\u30FC\u30C9", "\u4ED5\u8A33\u5E33", "\u7DCF\u52D8\u5B9A\u5143\u5E33", "\u8A66\u7B97\u8868", "P/L", "B/S", "\u6D88\u8CBB\u7A0E\u96C6\u8A08\u8868"].includes(page) && /* @__PURE__ */ (0, import_jsx_runtime31.jsxs)("section", { className: "periodbar", children: [
+          ["\u30C0\u30C3\u30B7\u30E5\u30DC\u30FC\u30C9", "\u4ED5\u8A33\u5E33", "\u7DCF\u52D8\u5B9A\u5143\u5E33", "\u8A66\u7B97\u8868", "P/L", "B/S", "\u6D88\u8CBB\u7A0E\u96C6\u8A08\u8868", "補助元帳・残高"].includes(page) && /* @__PURE__ */ (0, import_jsx_runtime31.jsxs)("section", { className: "periodbar", children: [
             /* @__PURE__ */ (0, import_jsx_runtime31.jsx)(Field, { label: "\u4F1A\u8A08\u5E74\u5EA6", children: /* @__PURE__ */ (0, import_jsx_runtime31.jsx)(Choice, { value: yearId, onChange: (id) => selectYear(s, id), options: [...s.years].sort((a, b) => a.start.localeCompare(b.start)).map((y) => [y.id, `${y.start} \u301C ${y.end}`]) }) }),
             /* @__PURE__ */ (0, import_jsx_runtime31.jsx)(Field, { label: "\u958B\u59CB\u65E5", children: /* @__PURE__ */ (0, import_jsx_runtime31.jsx)(Input, { type: "date", value: start, onChange: (e) => setStart(e.target.value) }) }),
             /* @__PURE__ */ (0, import_jsx_runtime31.jsx)(Field, { label: "\u7D42\u4E86\u65E5", children: /* @__PURE__ */ (0, import_jsx_runtime31.jsx)(Input, { type: "date", value: end, onChange: (e) => setEnd(e.target.value) }) }),

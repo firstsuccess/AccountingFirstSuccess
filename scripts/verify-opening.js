@@ -7,7 +7,7 @@ import {transferRows} from '../lib/csv-transfer.js';
 const user='opening-test';
 const fresh=()=>createCompany(user,'Opening test','2025-04-01','2026-03-31');
 const account=(s,code)=>s.accounts.find(a=>a.account_code===code);
-const balances=(s,values={})=>openingPlan(s,s.years.at(-1).id).rows.map(a=>{const n=BigInt(values[a.account_code]??a.target);return {account_id:a.id,debit_amount:n>0n?String(n):'0',credit_amount:n<0n?String(-n):'0'};});
+const balances=(s,values={})=>openingPlan(s,s.years.at(-1).id).rows.map(a=>{const n=BigInt(values[a.account_code]??a.target);return {account_id:a.id,subaccount_name:a.subaccount_name,debit_amount:n>0n?String(n):'0',credit_amount:n<0n?String(-n):'0'};});
 const opening=(s,values)=>mutate(s,{type:'opening',year_id:s.years.at(-1).id,balances:balances(s,values),reason:'verification',confirm_start_journals:true},user);
 const report=s=>reports(s,s.years.at(-1).start,s.years.at(-1).end);
 const post=(s,date,debit,credit,n)=>mutate(s,{type:'journal',transaction_date:date,description:'verification',lines:[{account_id:account(s,debit).id,debit_amount:n,credit_amount:0},{account_id:account(s,credit).id,debit_amount:0,credit_amount:n}]},user);
@@ -40,7 +40,7 @@ let legacy=post(fresh(),'2025-04-01','1100','3000',100);assert.throws(()=>mutate
 const bundle=fs.readFileSync(new URL('../public/app.js',import.meta.url),'utf8');
 const context=vm.createContext({BigInt,Date,Set,structuredClone});
 let code='const sum=(rs,key)=>rs.reduce((n,r)=>n+BigInt(r[key]||0),0n);\n';
-for(const name of ['assert','date','currentLines','postingLines','reports','ledger','openingPlan']){const start=bundle.indexOf('function '+name+'(');assert.ok(start>=0,name);const end=bundle.indexOf('\n}',start)+2;code+=bundle.slice(start,end)+'\n';}
+for(const name of ['assert','date','subaccountName','cleanSubaccount','currentLines','postingLines','reports','ledger','openingPlan']){const start=bundle.indexOf('function '+name+'(');assert.ok(start>=0,name);const end=bundle.indexOf('\n}',start)+2;code+=bundle.slice(start,end)+'\n';}
 vm.runInContext(code,context);assert.equal(JSON.stringify(context.reports(s,'2026-04-01','2027-03-31')),JSON.stringify(report(s)));assert.equal(context.openingPlan(s,s.years.at(-1).id).rows.find(a=>a.account_code==='1100').target,'2200');
 const jsx=(type,props,key)=>({type,props,key});
 Object.assign(context,{import_jsx_runtime31:{jsx,jsxs:jsx},import_react8:{useState:init=>[typeof init==='function'?init():init,()=>{}]},Input:'input',Button:'button'});

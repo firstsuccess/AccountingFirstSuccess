@@ -258,7 +258,7 @@ function AccountingApp() {
             else setError("\u65E2\u5B58\u306E\u300C\u30C6\u30B9\u30C8\u300D\u4F1A\u793E\u304C\u898B\u3064\u304B\u308A\u307E\u305B\u3093");
           }, children: "\u65E2\u5B58\u306E\u30C6\u30B9\u30C8\u4F1A\u793E\u3092\u958B\u304F" })
         ] }) : /* @__PURE__ */ jsxs(Fragment, { children: [
-          ["\u30C0\u30C3\u30B7\u30E5\u30DC\u30FC\u30C9", "\u4ED5\u8A33\u5E33", "\u7DCF\u52D8\u5B9A\u5143\u5E33", "\u8A66\u7B97\u8868", "P/L", "B/S", "\u6D88\u8CBB\u7A0E\u96C6\u8A08\u8868"].includes(page) && /* @__PURE__ */ jsxs("section", { className: "periodbar", children: [
+          ["\u30C0\u30C3\u30B7\u30E5\u30DC\u30FC\u30C9", "\u4ED5\u8A33\u5E33", "\u7DCF\u52D8\u5B9A\u5143\u5E33", "\u8A66\u7B97\u8868", "P/L", "B/S", "\u6D88\u8CBB\u7A0E\u96C6\u8A08\u8868", "補助元帳・残高"].includes(page) && /* @__PURE__ */ jsxs("section", { className: "periodbar", children: [
             /* @__PURE__ */ jsx(Field, { label: "\u4F1A\u8A08\u5E74\u5EA6", children: /* @__PURE__ */ jsx(Choice, { value: yearId, onChange: (id) => selectYear(s, id), options: [...s.years].sort((a, b) => a.start.localeCompare(b.start)).map((y) => [y.id, `${y.start} \u301C ${y.end}`]) }) }),
             /* @__PURE__ */ jsx(Field, { label: "\u958B\u59CB\u65E5", children: /* @__PURE__ */ jsx(Input, { type: "date", value: start, onChange: (e) => setStart(e.target.value) }) }),
             /* @__PURE__ */ jsx(Field, { label: "\u7D42\u4E86\u65E5", children: /* @__PURE__ */ jsx(Input, { type: "date", value: end, onChange: (e) => setEnd(e.target.value) }) }),
