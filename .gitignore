@@ -5,7 +5,9 @@ users.json
 node_modules/
 logs/
 *.log
+*.log.*
 *.bak
 *.bak.*
 .git/
 *.exe
+backups/

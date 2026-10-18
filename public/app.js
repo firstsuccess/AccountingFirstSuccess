@@ -23975,7 +23975,7 @@ function date(v) {
 }
 var sum = (rs, key) => rs.reduce((a, r2) => a + BigInt(r2[key] || 0), 0n);
 function currentLines(s, j) {
-  return s.lines.filter((l) => l.journal_id === j.id && l.revision === j.revision);
+  return s.lines.filter((l) => l.journal_id === j.id && l.revision === j.revision).sort((a,b)=>(a.line_number||0)-(b.line_number||0));
 }
 function open(s, d) {
   const y = s.years.find((y2) => y2.start <= d && d <= y2.end);
