@@ -1,4 +1,4 @@
-import { assert, currentLines, mutate } from "./core.js";
+import { assert, currentLines, mutate, date } from "./core.js";
 import { rateBps, yen } from "./tax.js";
 function parseJournalCSV(text) {
   assert(typeof text === "string" && text.length <= 5e6, "CSV\u306F5MB\u4EE5\u5185\u3067\u3059");
@@ -84,6 +84,11 @@ function inputLine(s, r) {
   const adjusted = known && r.calculated_tax_amount !== void 0 && r.calculated_tax_amount !== "" && integer(r.calculated_tax_amount, "\u8A08\u7B97\u7A0E\u984D") !== integer(r.tax_amount, "\u7A0E\u984D");
   return { account_id: a.id, subaccount_id: sub?.id || null, subaccount_name: r.subaccount_name ?? sub?.name ?? "", debit_amount: side === "DEBIT" ? input : 0, credit_amount: side === "CREDIT" ? input : 0, amount_input_type: r.amount_input_type || "NET", tax_code: code, line_description: r.line_description || "", original_line_id: r.line_id || void 0, tax_override: adjusted || known && r.tax_adjustment_reason ? r.tax_amount : "", tax_adjustment_reason: r.tax_adjustment_reason || "" };
 }
+function normalizeCSVDate(value) {
+  const match=/^(\d{4})([-/])(\d{1,2})\2(\d{1,2})$/.exec(String(value || '').trim());
+  assert(match,'日付が正しくありません（YYYY-M-D または YYYY/M/Dで指定してください）');
+  return date(`${match[1]}-${match[3].padStart(2,'0')}-${match[4].padStart(2,'0')}`);
+}
 function prepareImport(before, text, user, reason, filename) {
   assert(before.company.owner === user, "\u4F1A\u793E\u3078\u306E\u30A2\u30AF\u30BB\u30B9\u6A29\u304C\u3042\u308A\u307E\u305B\u3093");
   assert(typeof reason === "string" && reason.trim() && reason.length <= 300, "\u53D6\u8FBC\u7406\u7531\u306F1\u301C300\u6587\u5B57\u3067\u5165\u529B\u3057\u3066\u304F\u3060\u3055\u3044");
@@ -104,6 +109,7 @@ function prepareImport(before, text, user, reason, filename) {
   for (const rs of ordered) {
     const r = rs[0];
     try {
+      for (const line of rs) line.transaction_date=normalizeCSVDate(line.transaction_date);
       for (const l of rs) for (const key of ["transaction_date", "description", "counterparty", "journal_kind"]) assert((l[key] || "") === (r[key] || ""), `\u540C\u4E00\u4F1D\u7968\u306E${key}\u304C\u4E00\u81F4\u3057\u307E\u305B\u3093`);
       assert(r.description && r.description.length <= 300 && (!r.counterparty || r.counterparty.length <= 300), "\u6458\u8981\u30FB\u53D6\u5F15\u5148\u306F300\u6587\u5B57\u4EE5\u5185\u3067\u3059\u3002\u6458\u8981\u306F\u5FC5\u9808\u3067\u3059");
       const old = r.journal_number ? before.journals.find((j2) => j2.journal_number === r.journal_number) : void 0;

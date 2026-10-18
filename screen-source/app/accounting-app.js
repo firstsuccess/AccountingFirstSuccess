@@ -15,7 +15,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { AlertDialog, AlertDialogContent, AlertDialogHeader, AlertDialogTitle, AlertDialogDescription, AlertDialogFooter, AlertDialogCancel, AlertDialogAction } from "@/components/ui/alert-dialog";
-import { sections, sectionTypes, currentLines, orderedTaxCodes, canEdit, reports, ledger, csv } from "@/lib/accounting/core";
+import { sections, sectionTypes, currentLines, orderedTaxCodes, canEdit, reports, ledger, journalBalances, csv } from "@/lib/accounting/core";
 const nav = [["\u30C0\u30C3\u30B7\u30E5\u30DC\u30FC\u30C9", LayoutDashboard], ["\u4ED5\u8A33\u5165\u529B", PenLine], ["\u4ED5\u8A33\u5E33", List], ["\u7DCF\u52D8\u5B9A\u5143\u5E33", BookText], ["\u8A66\u7B97\u8868", Scale], ["P/L", ChartNoAxesCombined], ["B/S", Landmark], ["\u52D8\u5B9A\u79D1\u76EE", Tags], ["補助元帳・残高", FolderTree], ["\u88DC\u52A9\u79D1\u76EE", FolderTree], ["\u4F1A\u8A08\u671F\u9593", CalendarDays], ["\u6D88\u8CBB\u7A0E\u96C6\u8A08\u8868", Scale], ["\u7A0E\u533A\u5206\u30FB\u8A2D\u5B9A", Tags], ["CSV\u53D6\u8FBC", Download], ["\u76E3\u67FB\u30ED\u30B0", History], ["\u8A2D\u5B9A", Settings]];
 const money = (n) => BigInt(n || 0).toLocaleString("ja-JP");
 function Choice({ value, onChange, options, label = "\u9078\u629E" }) {
@@ -143,6 +143,10 @@ function AccountingApp() {
       return null;
     }
   }, [s, start, end]);
+  const journalAccountBalances=useMemo(()=>{
+    if(!s||!start||!end)return new Map();
+    try{return journalBalances(s,start,end);}catch{return new Map();}
+  },[s,start,end]);
   const accountName = (id) => s?.accounts.find((a) => a.id === id)?.account_name || id;
   const subName = (id) => s?.subaccounts.find((a) => a.id === id)?.name || "";
   const filtered = useMemo(() => s?.journals.filter((j) => {
@@ -340,8 +344,14 @@ function AccountingApp() {
                 "\u8868\u793A\u7D50\u679CCSV"
               ] })
             ] }),
-            /* @__PURE__ */ jsx(GridTable, { heads: ["\u65E5\u4ED8 / \u4ED5\u8A33\u756A\u53F7", "\u6458\u8981 / \u53D6\u5F15\u5148", "\u501F\u65B9\u79D1\u76EE", "\u8CB8\u65B9\u79D1\u76EE", "\u91D1\u984D\uFF08\u5186\uFF09", "\u72B6\u614B", "\u64CD\u4F5C"], rows: filtered.map((j) => {
+            jsx("p",{className:"muted",children:"残高は各仕訳を反映した直後の勘定科目全体の残高です。通常残高方向を正とし、検索対象外の仕訳も計算に含めます。削除済み仕訳は残高に含めません。"}),
+            /* @__PURE__ */ jsx(GridTable, { heads: ["\u65E5\u4ED8 / \u4ED5\u8A33\u756A\u53F7", "\u6458\u8981 / \u53D6\u5F15\u5148", "\u501F\u65B9\u79D1\u76EE", "\u8CB8\u65B9\u79D1\u76EE", "\u91D1\u984D\uFF08\u5186\uFF09", "借方科目の残高（円）", "貸方科目の残高（円）", "\u72B6\u614B", "\u64CD\u4F5C"], rows: filtered.map((j) => {
               const ls = currentLines(s, j).slice().sort((a,b)=>(s.accounts.find(x=>x.id===a.account_id)?.account_code||"").localeCompare(s.accounts.find(x=>x.id===b.account_id)?.account_code||"","ja",{numeric:true}));
+              function balanceCell(side){
+                if(j.status!=="ACTIVE")return "—";
+                const ids=[...new Set(ls.filter(l=>side==="DEBIT"?l.debit_amount:l.credit_amount).map(l=>l.account_id))];
+                return jsx("div",{children:ids.map(id=>jsx("div",{children:accountName(id)+"："+(journalAccountBalances.get(j.id)?.[id]===undefined?"—":money(journalAccountBalances.get(j.id)[id]))},id))});
+              }
               return [/* @__PURE__ */ jsxs("div", { className: j.status === "DELETED" ? "deleted" : "", children: [
                 j.transaction_date,
                 /* @__PURE__ */ jsx("br", {}),
@@ -349,7 +359,7 @@ function AccountingApp() {
               ] }), /* @__PURE__ */ jsxs("div", { className: j.status === "DELETED" ? "deleted" : "", children: [
                 j.description,
                 /* @__PURE__ */ jsx("small", { className: "block muted", children: j.counterparty })
-              ] }), ls.filter((l) => l.debit_amount).map((l) => accountName(l.account_id)).join("\u30FB"), ls.filter((l) => l.credit_amount).map((l) => accountName(l.account_id)).join("\u30FB"), money(ls.reduce((n, l) => n + BigInt(l.debit_amount), 0n)), /* @__PURE__ */ jsx("span", { className: "status " + j.status, children: j.status }), /* @__PURE__ */ jsxs("div", { className: "row", children: [
+              ] }), ls.filter((l) => l.debit_amount).map((l) => accountName(l.account_id)).join("\u30FB"), ls.filter((l) => l.credit_amount).map((l) => accountName(l.account_id)).join("\u30FB"), money(ls.reduce((n, l) => n + BigInt(l.debit_amount), 0n)), balanceCell("DEBIT"), balanceCell("CREDIT"), /* @__PURE__ */ jsx("span", { className: "status " + j.status, children: j.status }), /* @__PURE__ */ jsxs("div", { className: "row", children: [
                 /* @__PURE__ */ jsx(Button, { variant: "ghost", size: "sm", onClick: () => setDetail(j), children: "\u8A73\u7D30" }),
                 canEdit(s, j) && /* @__PURE__ */ jsxs(Fragment, { children: [
                   /* @__PURE__ */ jsx(Button, { variant: "ghost", size: "sm", onClick: () => edit(j), children: "\u7DE8\u96C6" }),

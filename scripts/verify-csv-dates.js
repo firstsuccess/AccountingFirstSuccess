@@ -1,0 +1,13 @@
+import assert from 'node:assert/strict';
+import {createCompany,csv} from '../lib/core.js';
+import {prepareImport} from '../lib/csv-import.js';
+const s=createCompany('date-test','Date test','2024-01-01','2024-12-31');
+const make=(a,b=a)=>csv(['1100','3000'].map((account_code,i)=>({company_id:s.company.id,journal_number:'',import_group:'g1',transaction_date:i?b:a,description:'date verification',account_code,debit_amount:i?0:1,credit_amount:i?1:0})));
+const run=(a,b)=>prepareImport(s,make(a,b),s.company.owner,'verification','date.csv').after;
+for(const value of ['2024-04-01','2024-4-1','2024-04-1','2024-4-01','2024/04/01','2024/4/1','2024/04/1','2024/4/01',' 2024/4/1 '])assert.equal(run(value).journals[0].transaction_date,'2024-04-01');
+assert.equal(run('2024/2/29').journals[0].transaction_date,'2024-02-29');
+assert.equal(run('2024/4/1','2024-04-01').journals[0].transaction_date,'2024-04-01');
+for(const value of ['2023/2/29','2024/2/30','2024/13/1','2024/0/1','2024/1/0','2024/4/31','2024/4-1','24/4/1','2024/4/1 12:00',''])assert.throws(()=>run(value),/日付が正しくありません/);
+assert.throws(()=>run('2024/4/1','2024/4/2'),/transaction_date/);
+assert.equal(s.journals.length,0);assert.equal(s.lines.length,0);
+console.log('PASS: zero-omitted months/days, slash/hyphen, canonical storage, leap-year validation, mixed equivalent formats, invalid dates and same-journal date consistency. No DB writes.');

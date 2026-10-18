@@ -23774,6 +23774,7 @@ function CSVImport({ s, onSaved, start, end }) {
   }
   return /* @__PURE__ */ (0, import_jsx_runtime19.jsxs)("section", { className: "panel", children: [
     /* @__PURE__ */ (0, import_jsx_runtime19.jsx)("h2", { children: "\u4ED5\u8A33CSV\u53D6\u8FBC" }),
+    (0, import_jsx_runtime19.jsx)("p",{className:"muted",children:"取引日は2026-04-01、2026-4-1、2026/4/1などの形式に対応しています。保存時はYYYY-MM-DDに統一します。"}),
     /* @__PURE__ */ (0, import_jsx_runtime19.jsxs)("p", { children: [
       "\u5BFE\u8C61\u4F1A\u793E\uFF1A",
       /* @__PURE__ */ (0, import_jsx_runtime19.jsx)("strong", { children: s.company.name }),
@@ -24071,6 +24072,25 @@ function reports(s, start, end) {
   const openingDiff = rows.reduce((n, a) => n + BigInt(a.opening), 0n), movementDiff = rows.reduce((n, a) => n + BigInt(a.debit) - BigInt(a.credit), 0n), closingDiff = rows.reduce((n, a) => n + BigInt(a.closing), 0n);
   const tag = (t) => rows.filter((a) => a.tag === t).reduce((n, a) => n + BigInt(a.closing) * (t === "AP" ? -1n : 1n), 0n);
   return { rows, groups: Object.fromEntries(Object.entries(groups).map(([k, v]) => [k, v.toString()])), pl: { gross: String(gross), operating: String(op), ordinary: String(ordinary), pretax: String(pretax), net: String(net) }, bs: { assets: String(assets), liabilities: String(liabilities), equity: String(equity), ytd_profit: String(ytd), difference: String(assets - liabilities - equity) }, trial: { opening_difference: String(openingDiff), movement_difference: String(movementDiff), closing_difference: String(closingDiff) }, dashboard: { sales: String(g("SALES")), expenses: String(g("COGS") + g("SGA") + g("OTHER_EXPENSE") + g("EXTRA_EXPENSE") + g("TAX")), profit: String(net), ytd_profit: String(ytd), ytd_sales: String(ls.filter((l) => l.date >= y.start && s.accounts.find((a) => a.id === l.account_id)?.section === "SALES").reduce((n, l) => n + BigInt(l.credit_amount) - BigInt(l.debit_amount), 0n)), cash: String(tag("CASH")), ar: String(tag("AR")), ap: String(tag("AP")) } };
+}
+function journalBalances(s, start, end) {
+  const initial=reports(s,start,end).rows;
+  const balances=new Map(initial.map(a=>[a.id,BigInt(a.opening)]));
+  const normal=new Map(initial.map(a=>[a.id,a.normal_balance==='CREDIT'?-1n:1n]));
+  const lines=new Map();
+  for(const line of s.lines){if(!lines.has(line.journal_id))lines.set(line.journal_id,[]);lines.get(line.journal_id).push(line);}
+  const result=new Map();
+  const journals=s.journals.filter(j=>j.status==='ACTIVE'&&j.transaction_date>=start&&j.transaction_date<=end).sort((a,b)=>a.transaction_date.localeCompare(b.transaction_date)||a.journal_number.localeCompare(b.journal_number)||a.id.localeCompare(b.id));
+  // Opening entries have already been included in the initial balances.
+  for(const opening of journals.filter(j=>j.journal_kind==='OPENING')){
+    result.set(opening.id,Object.fromEntries((lines.get(opening.id)||[]).filter(l=>l.revision===opening.revision).map(l=>[l.account_id,String((balances.get(l.account_id)||0n)*(normal.get(l.account_id)||1n))])));
+  }
+  for(const j of journals.filter(j=>j.journal_kind!=='OPENING')){
+    const current=(lines.get(j.id)||[]).filter(l=>l.revision===j.revision);
+    for(const l of current)balances.set(l.account_id,(balances.get(l.account_id)||0n)+BigInt(l.debit_amount)-BigInt(l.credit_amount));
+    result.set(j.id,Object.fromEntries(current.map(l=>[l.account_id,String((balances.get(l.account_id)||0n)*(normal.get(l.account_id)||1n))])));
+  }
+  return result;
 }
 function ledger(s, accountId, start, end) {
   const r = reports(s, start, end), a = r.rows.find((a2) => a2.id === accountId);
@@ -25962,6 +25982,10 @@ function AccountingApp() {
       return null;
     }
   }, [s, start, end]);
+  const journalAccountBalances=(0, import_react8.useMemo)(()=>{
+    if(!s||!start||!end)return new Map();
+    try{return journalBalances(s,start,end);}catch{return new Map();}
+  },[s,start,end]);
   const accountName = (id) => s?.accounts.find((a) => a.id === id)?.account_name || id;
   const subName = (id) => s?.subaccounts.find((a) => a.id === id)?.name || "";
   const filtered = (0, import_react8.useMemo)(() => s?.journals.filter((j) => {
@@ -26159,8 +26183,14 @@ function AccountingApp() {
                 "\u8868\u793A\u7D50\u679CCSV"
               ] })
             ] }),
-            /* @__PURE__ */ (0, import_jsx_runtime31.jsx)(GridTable, { heads: ["\u65E5\u4ED8 / \u4ED5\u8A33\u756A\u53F7", "\u6458\u8981 / \u53D6\u5F15\u5148", "\u501F\u65B9\u79D1\u76EE", "\u8CB8\u65B9\u79D1\u76EE", "\u91D1\u984D\uFF08\u5186\uFF09", "\u72B6\u614B", "\u64CD\u4F5C"], rows: filtered.map((j) => {
+            (0, import_jsx_runtime31.jsx)("p",{className:"muted",children:"残高は各仕訳を反映した直後の勘定科目全体の残高です。通常残高方向を正とし、検索対象外の仕訳も計算に含めます。削除済み仕訳は残高に含めません。"}),
+            /* @__PURE__ */ (0, import_jsx_runtime31.jsx)(GridTable, { heads: ["\u65E5\u4ED8 / \u4ED5\u8A33\u756A\u53F7", "\u6458\u8981 / \u53D6\u5F15\u5148", "\u501F\u65B9\u79D1\u76EE", "\u8CB8\u65B9\u79D1\u76EE", "\u91D1\u984D\uFF08\u5186\uFF09", "借方科目の残高（円）", "貸方科目の残高（円）", "\u72B6\u614B", "\u64CD\u4F5C"], rows: filtered.map((j) => {
               const ls = currentLines(s, j).slice().sort((a,b)=>(s.accounts.find(x=>x.id===a.account_id)?.account_code||"").localeCompare(s.accounts.find(x=>x.id===b.account_id)?.account_code||"","ja",{numeric:true}));
+              function balanceCell(side){
+                if(j.status!=="ACTIVE")return "—";
+                const ids=[...new Set(ls.filter(l=>side==="DEBIT"?l.debit_amount:l.credit_amount).map(l=>l.account_id))];
+                return (0, import_jsx_runtime31.jsx)("div",{children:ids.map(id=>(0, import_jsx_runtime31.jsx)("div",{children:accountName(id)+"："+(journalAccountBalances.get(j.id)?.[id]===undefined?"—":money2(journalAccountBalances.get(j.id)[id]))},id))});
+              }
               return [/* @__PURE__ */ (0, import_jsx_runtime31.jsxs)("div", { className: j.status === "DELETED" ? "deleted" : "", children: [
                 j.transaction_date,
                 /* @__PURE__ */ (0, import_jsx_runtime31.jsx)("br", {}),
@@ -26168,7 +26198,7 @@ function AccountingApp() {
               ] }), /* @__PURE__ */ (0, import_jsx_runtime31.jsxs)("div", { className: j.status === "DELETED" ? "deleted" : "", children: [
                 j.description,
                 /* @__PURE__ */ (0, import_jsx_runtime31.jsx)("small", { className: "block muted", children: j.counterparty })
-              ] }), ls.filter((l) => l.debit_amount).map((l) => accountName(l.account_id)).join("\u30FB"), ls.filter((l) => l.credit_amount).map((l) => accountName(l.account_id)).join("\u30FB"), money2(ls.reduce((n, l) => n + BigInt(l.debit_amount), 0n)), /* @__PURE__ */ (0, import_jsx_runtime31.jsx)("span", { className: "status " + j.status, children: j.status }), /* @__PURE__ */ (0, import_jsx_runtime31.jsxs)("div", { className: "row", children: [
+              ] }), ls.filter((l) => l.debit_amount).map((l) => accountName(l.account_id)).join("\u30FB"), ls.filter((l) => l.credit_amount).map((l) => accountName(l.account_id)).join("\u30FB"), money2(ls.reduce((n, l) => n + BigInt(l.debit_amount), 0n)), balanceCell("DEBIT"), balanceCell("CREDIT"), /* @__PURE__ */ (0, import_jsx_runtime31.jsx)("span", { className: "status " + j.status, children: j.status }), /* @__PURE__ */ (0, import_jsx_runtime31.jsxs)("div", { className: "row", children: [
                 /* @__PURE__ */ (0, import_jsx_runtime31.jsx)(Button, { variant: "ghost", size: "sm", onClick: () => setDetail(j), children: "\u8A73\u7D30" }),
                 canEdit(s, j) && /* @__PURE__ */ (0, import_jsx_runtime31.jsxs)(import_react8.Fragment, { children: [
                   /* @__PURE__ */ (0, import_jsx_runtime31.jsx)(Button, { variant: "ghost", size: "sm", onClick: () => edit(j), children: "\u7DE8\u96C6" }),

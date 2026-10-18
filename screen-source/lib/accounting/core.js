@@ -393,6 +393,25 @@ function ledger(s, accountId, start, end) {
   });
   return { opening: a.opening, closing: String(balance), rows };
 }
+function journalBalances(s, start, end) {
+  const initial=reports(s,start,end).rows;
+  const balances=new Map(initial.map(a=>[a.id,BigInt(a.opening)]));
+  const normal=new Map(initial.map(a=>[a.id,a.normal_balance==='CREDIT'?-1n:1n]));
+  const lines=new Map();
+  for(const line of s.lines){if(!lines.has(line.journal_id))lines.set(line.journal_id,[]);lines.get(line.journal_id).push(line);}
+  const result=new Map();
+  const journals=s.journals.filter(j=>j.status==='ACTIVE'&&j.transaction_date>=start&&j.transaction_date<=end).sort((a,b)=>a.transaction_date.localeCompare(b.transaction_date)||a.journal_number.localeCompare(b.journal_number)||a.id.localeCompare(b.id));
+  // Opening entries have already been included in the initial balances.
+  for(const opening of journals.filter(j=>j.journal_kind==='OPENING')){
+    result.set(opening.id,Object.fromEntries((lines.get(opening.id)||[]).filter(l=>l.revision===opening.revision).map(l=>[l.account_id,String((balances.get(l.account_id)||0n)*(normal.get(l.account_id)||1n))])));
+  }
+  for(const j of journals.filter(j=>j.journal_kind!=='OPENING')){
+    const current=(lines.get(j.id)||[]).filter(l=>l.revision===j.revision);
+    for(const l of current)balances.set(l.account_id,(balances.get(l.account_id)||0n)+BigInt(l.debit_amount)-BigInt(l.credit_amount));
+    result.set(j.id,Object.fromEntries(current.map(l=>[l.account_id,String((balances.get(l.account_id)||0n)*(normal.get(l.account_id)||1n))])));
+  }
+  return result;
+}
 function csv(rows, columns) {
   const keys = columns || [...new Set(rows.flatMap((r) => Object.keys(r)))];
   const cell = (v) => {
@@ -432,6 +451,7 @@ export {
   currentLines,
   date,
   ledger,
+  journalBalances,
   mutate,
   postingLines,
   reports,

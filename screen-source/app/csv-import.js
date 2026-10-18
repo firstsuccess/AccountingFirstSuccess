@@ -55,6 +55,7 @@ function CSVImport({ s, onSaved, start, end }) {
   }
   return /* @__PURE__ */ jsxs("section", { className: "panel", children: [
     /* @__PURE__ */ jsx("h2", { children: "\u4ED5\u8A33CSV\u53D6\u8FBC" }),
+    jsx("p",{className:"muted",children:"取引日は2026-04-01、2026-4-1、2026/4/1などの形式に対応しています。保存時はYYYY-MM-DDに統一します。"}),
     /* @__PURE__ */ jsxs("p", { children: [
       "\u5BFE\u8C61\u4F1A\u793E\uFF1A",
       /* @__PURE__ */ jsx("strong", { children: s.company.name }),
